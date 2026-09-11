@@ -44,6 +44,14 @@ export function getDB(): Promise<IDBPDatabase> {
   return dbPromise;
 }
 
+/** Close the connection so the next getDB() reopens (used by tests and after deleteDatabase). */
+export async function closeDB(): Promise<void> {
+  if (!dbPromise) return;
+  const db = await dbPromise;
+  db.close();
+  dbPromise = null;
+}
+
 export function defaultSettings(): AppSettings {
   return {
     id: 'settings',
@@ -58,6 +66,8 @@ export function defaultSettings(): AppSettings {
     maWindowDays: 7,
     soundOn: true,
     vibrateOn: true,
+    goalMode: null,
+    seedMarkers: [],
   };
 }
 

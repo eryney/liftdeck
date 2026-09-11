@@ -1,5 +1,15 @@
 import type { BoxingAttendance, DayActivity, WorkoutPlan, WorkoutSession } from '../types';
 import { addDays, todayISO, weekStart, weekdayIndex } from './dates';
+import { isFixedPlan } from './flex';
+
+/**
+ * LEGACY weekday adherence for FIXED plans only. Flex plans use lib/flex.ts (weekly attainment)
+ * and never mark a weekday as missed. A flex plan passed here is treated as "no schedule".
+ */
+
+function scheduleFor(plan: WorkoutPlan | null, date: string): DayActivity {
+  return plan && isFixedPlan(plan) ? plan.schedule[weekdayIndex(date)] : { type: 'rest' };
+}
 
 export type DayStatus =
   | 'rest'
@@ -34,7 +44,7 @@ function isDone(activity: DayActivity, date: string, ctx: AdherenceContext): boo
 
 export function dayInfo(date: string, ctx: AdherenceContext): DayInfo {
   const today = ctx.today ?? todayISO();
-  const activity: DayActivity = ctx.plan ? ctx.plan.schedule[weekdayIndex(date)] : { type: 'rest' };
+  const activity: DayActivity = scheduleFor(ctx.plan, date);
   // extra-credit: activity logged on a rest day still shows as completed
   if (activity.type === 'rest') {
     const boxed = ctx.boxing.some((b) => b.date === date);
@@ -83,7 +93,7 @@ export function weekPlanStats(ctx: AdherenceContext, today = todayISO()) {
   let completed = 0;
   for (let i = 0; i < 7; i++) {
     const d = addDays(start, i);
-    const activity: DayActivity = ctx.plan ? ctx.plan.schedule[weekdayIndex(d)] : { type: 'rest' };
+    const activity: DayActivity = scheduleFor(ctx.plan, d);
     if (activity.type === 'rest') continue;
     if ('optional' in activity && activity.optional) continue;
     planned += 1;

@@ -1,47 +1,52 @@
 import { useState } from 'react';
 import { store, useAppState } from '../store/store';
-import { PLAN_ID } from '../data/seedPlan';
-import { WEEKDAY_NAMES } from '../lib/dates';
+import { BOXER_CUT_PLAN_ID } from '../data/seedPlan';
+import { isFlexPlan } from '../lib/flex';
 
 export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) {
   const state = useAppState();
   const [preview, setPreview] = useState(false);
-  const plan = state.plans.find((p) => p.id === PLAN_ID);
+  const plan = state.plans.find((p) => p.id === BOXER_CUT_PLAN_ID) ?? state.plans[0];
 
-  if (preview && plan) {
+  if (preview && plan && isFlexPlan(plan)) {
     return (
       <div className="screen" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div className="topline">WEEKLY SCHEDULE</div>
-        <h1 className="title">{plan.name}</h1>
+        <div className="topline">WEEKLY TARGETS · NO FIXED WEEKDAYS</div>
+        <h1 className="title">{plan.name} // FLEX</h1>
         <div className="panel mt16">
-          {plan.schedule.map((a, i) => (
-            <div key={i} className="spread mt8">
-              <span className="faint small" style={{ width: 100 }}>{WEEKDAY_NAMES[i]}</span>
-              <span className="small" style={{ flex: 1, textAlign: 'right' }}>
-                {a.type === 'rest' ? (
-                  <span className="faint">—</span>
-                ) : a.type === 'boxing' ? (
-                  'BOXING'
+          {plan.weeklyGoals.map((g) => (
+            <div key={g.id} className="spread mt8">
+              <span className="small" style={{ fontWeight: 700, letterSpacing: '0.14em' }}>
+                {g.kind === 'boxing' ? 'BOXING' : g.kind === 'rotation' ? 'STRENGTH' : g.optional ? 'OPTIONAL' : 'WORKOUT'}
+              </span>
+              <span className="small dim" style={{ textAlign: 'right' }}>
+                {g.kind === 'workout' && g.optional ? (
+                  <>{store.templateById(g.templateId)?.subtitle ?? ''} · 0–{g.max ?? g.target}</>
                 ) : (
-                  store.templateById(a.templateId)?.name ?? '?'
+                  <>
+                    minimum {g.minimum} · target {g.target}
+                    {g.kind === 'rotation' && <div className="tiny faint">A ↔ B full body · rotation never resets</div>}
+                  </>
                 )}
-                {'optional' in a && a.optional && <span className="purple tiny"> OPT</span>}
               </span>
             </div>
           ))}
         </div>
         <div className="dim small mt16">
-          Strength days auto-track weights and progression. Boxing days are one tap. Friday is optional —
-          skipping it never counts against you.
+          Boxing is the sport. Two short full-body lifts keep strength and muscle while cutting; one is the floor on a bad week.
+          Weeks are judged on totals, never on which day something happened. Rest days are just rest.
         </div>
         <button
           className="btn btn--primary mt16"
           onClick={() => {
-            store.completeOnboarding(PLAN_ID);
+            store.completeOnboarding(plan.id);
             onDone(false);
           }}
         >
           LET'S GO ▸
+        </button>
+        <button className="btn btn--ghost mt8" onClick={() => setPreview(false)}>
+          BACK
         </button>
       </div>
     );
@@ -54,15 +59,15 @@ export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) 
         <h1 className="title" style={{ fontSize: 34 }}>
           LIFT<span className="cyan">DECK</span>
         </h1>
-        <div className="dim small">Your training, on rails. Choose a plan:</div>
+        <div className="dim small">Boxing first. Lifting fits around it. Choose a plan:</div>
       </div>
       <button className="btn btn--primary mt16" onClick={() => setPreview(true)}>
-        {plan?.name ?? 'PROGRAM 01'}
+        {plan ? `${plan.name} // FLEX` : 'BOXER CUT // FLEX'}
       </button>
       <button
         className="btn btn--ghost mt8"
         onClick={() => {
-          store.completeOnboarding(PLAN_ID);
+          store.completeOnboarding(plan?.id ?? null);
           onDone(true);
         }}
       >

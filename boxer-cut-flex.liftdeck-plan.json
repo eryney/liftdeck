@@ -1,0 +1,280 @@
+{
+  "app": "liftdeck-plan",
+  "schemaVersion": 2,
+  "exportedAt": "2026-09-10T17:15:21.470Z",
+  "plan": {
+    "id": "plan_boxer_cut_flex",
+    "name": "BOXER CUT",
+    "mode": "flex",
+    "weeklyGoals": [
+      {
+        "id": "goal_boxing",
+        "kind": "boxing",
+        "minimum": 2,
+        "target": 4
+      },
+      {
+        "id": "goal_strength",
+        "kind": "rotation",
+        "templateIds": [
+          "tpl_bc_strength_a",
+          "tpl_bc_strength_b"
+        ],
+        "minimum": 1,
+        "target": 2,
+        "max": 2,
+        "minGapHours": 36
+      },
+      {
+        "id": "goal_optional",
+        "kind": "workout",
+        "templateId": "tpl_bc_optional_upper_abs",
+        "minimum": 0,
+        "target": 1,
+        "max": 1,
+        "optional": true
+      }
+    ]
+  },
+  "templates": [
+    {
+      "id": "tpl_bc_strength_a",
+      "name": "STRENGTH A",
+      "subtitle": "FULL BODY",
+      "exercises": [
+        {
+          "id": "bca_0_db-bulgarian-split-squat",
+          "exerciseId": "db-bulgarian-split-squat",
+          "sets": 2,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 150,
+          "increment": 5,
+          "startWeight": 20,
+          "targetRir": 2
+        },
+        {
+          "id": "bca_1_pull-up",
+          "exerciseId": "pull-up",
+          "sets": 3,
+          "repMin": 5,
+          "repMax": 8,
+          "restSec": 150,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 2
+        },
+        {
+          "id": "bca_2_db-incline-press",
+          "exerciseId": "db-incline-press",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 150,
+          "increment": 2.5,
+          "startWeight": 35,
+          "targetRir": 2
+        },
+        {
+          "id": "bca_3_db-rdl",
+          "exerciseId": "db-rdl",
+          "sets": 2,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 150,
+          "increment": 5,
+          "startWeight": 40,
+          "targetRir": 2
+        },
+        {
+          "id": "bca_4_cable-lateral-raise",
+          "exerciseId": "cable-lateral-raise",
+          "sets": 2,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 10,
+          "targetRir": 1
+        },
+        {
+          "id": "bca_5_cable-crunch",
+          "exerciseId": "cable-crunch",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 15,
+          "restSec": 75,
+          "increment": 2.5,
+          "startWeight": 30,
+          "targetRir": 1
+        }
+      ]
+    },
+    {
+      "id": "tpl_bc_strength_b",
+      "name": "STRENGTH B",
+      "subtitle": "FULL BODY",
+      "exercises": [
+        {
+          "id": "bcb_0_db-step-up",
+          "exerciseId": "db-step-up",
+          "sets": 2,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 120,
+          "increment": 5,
+          "startWeight": 20,
+          "targetRir": 2
+        },
+        {
+          "id": "bcb_1_db-bench-press",
+          "exerciseId": "db-bench-press",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 150,
+          "increment": 2.5,
+          "startWeight": 40,
+          "targetRir": 2
+        },
+        {
+          "id": "bcb_2_db-one-arm-row",
+          "exerciseId": "db-one-arm-row",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 120,
+          "increment": 5,
+          "startWeight": 40,
+          "targetRir": 2
+        },
+        {
+          "id": "bcb_3_cable-leg-curl",
+          "exerciseId": "cable-leg-curl",
+          "sets": 2,
+          "repMin": 10,
+          "repMax": 15,
+          "restSec": 90,
+          "increment": 2.5,
+          "startWeight": 20,
+          "targetRir": 1
+        },
+        {
+          "id": "bcb_4_face-pull",
+          "exerciseId": "face-pull",
+          "sets": 2,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 30,
+          "targetRir": 1
+        },
+        {
+          "id": "bcb_5_standing-calf-raise",
+          "exerciseId": "standing-calf-raise",
+          "sets": 3,
+          "repMin": 10,
+          "repMax": 20,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1
+        },
+        {
+          "id": "bcb_6_hanging-leg-raise",
+          "exerciseId": "hanging-leg-raise",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 15,
+          "restSec": 75,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1
+        }
+      ]
+    },
+    {
+      "id": "tpl_bc_optional_upper_abs",
+      "name": "OPTIONAL",
+      "subtitle": "UPPER + ABS",
+      "exercises": [
+        {
+          "id": "bco_0_cable-lateral-raise",
+          "exerciseId": "cable-lateral-raise",
+          "sets": 3,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 10,
+          "targetRir": 1
+        },
+        {
+          "id": "bco_1_cable-rear-delt-fly",
+          "exerciseId": "cable-rear-delt-fly",
+          "sets": 2,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 15,
+          "targetRir": 1
+        },
+        {
+          "id": "bco_2_cable-curl",
+          "exerciseId": "cable-curl",
+          "sets": 2,
+          "repMin": 8,
+          "repMax": 15,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 30,
+          "targetRir": 1
+        },
+        {
+          "id": "bco_3_cable-triceps-pushdown",
+          "exerciseId": "cable-triceps-pushdown",
+          "sets": 2,
+          "repMin": 8,
+          "repMax": 15,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 30,
+          "targetRir": 1
+        },
+        {
+          "id": "bco_4_cable-woodchop",
+          "exerciseId": "cable-woodchop",
+          "sets": 2,
+          "repMin": 10,
+          "repMax": 15,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 20,
+          "targetRir": 2
+        },
+        {
+          "id": "bco_5_hanging-knee-raise",
+          "exerciseId": "hanging-knee-raise",
+          "sets": 2,
+          "repMin": 10,
+          "repMax": 15,
+          "restSec": 60,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1
+        }
+      ]
+    }
+  ],
+  "exercises": [
+    {
+      "id": "cable-leg-curl",
+      "name": "Cable Leg Curl",
+      "category": "Hamstrings",
+      "equipment": "cable",
+      "perSide": true
+    }
+  ]
+}

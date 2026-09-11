@@ -28,14 +28,19 @@ export interface TemplateExercise {
   repMin: number;
   repMax: number;
   restSec: number;
+  /** load increment for this slot (per hand for perHand exercises; total added load for bodyweight) */
   increment: number;
   /** starting weight before any history exists */
   startWeight: number;
+  /** reps in reserve to aim for on working sets (optional telemetry; never drives progression) */
+  targetRir?: number;
 }
 
 export interface WorkoutTemplate {
   id: string;
   name: string;
+  /** e.g. "FULL BODY", "UPPER + ABS" — shown after the name as NAME // SUBTITLE */
+  subtitle?: string;
   exercises: TemplateExercise[];
 }
 
@@ -44,12 +49,54 @@ export type DayActivity =
   | { type: 'boxing'; optional?: boolean }
   | { type: 'workout'; templateId: string; optional?: boolean };
 
-export interface WorkoutPlan {
+/** Legacy weekday-based plan. Records without `mode` are treated as fixed. */
+export interface FixedWorkoutPlan {
   id: string;
   name: string;
+  mode?: 'fixed';
   /** index 0 = Monday ... 6 = Sunday */
   schedule: DayActivity[];
 }
+
+export type WeeklyGoal =
+  | {
+      id: string;
+      kind: 'boxing';
+      minimum: number;
+      target: number;
+      max?: number;
+    }
+  | {
+      id: string;
+      kind: 'rotation';
+      /** templates cycled chronologically: A → B → A → B, never reset by the calendar */
+      templateIds: string[];
+      minimum: number;
+      target: number;
+      max?: number;
+      /** suggested spacing between sessions of this rotation */
+      minGapHours?: number;
+    }
+  | {
+      id: string;
+      kind: 'workout';
+      templateId: string;
+      minimum: number;
+      target: number;
+      max?: number;
+      /** optional goals never affect foundation/target attainment */
+      optional?: boolean;
+    };
+
+/** Weekly-goal plan: attainment is judged per week (Mon–Sun), never per weekday. */
+export interface FlexWorkoutPlan {
+  id: string;
+  name: string;
+  mode: 'flex';
+  weeklyGoals: WeeklyGoal[];
+}
+
+export type WorkoutPlan = FixedWorkoutPlan | FlexWorkoutPlan;
 
 export interface SetRecord {
   reps: number | null; // null = not yet performed
@@ -57,7 +104,12 @@ export interface SetRecord {
   loggedAt?: number;
 }
 
-export type ExerciseResult = 'progress' | 'keep';
+/**
+ * Outcome of an exercise exposure.
+ * v1 snapshots used 'progress' | 'keep'; v2 uses increase | hold | reduce | incomplete.
+ * Old values are kept verbatim in history and mapped for display.
+ */
+export type ExerciseResult = 'progress' | 'keep' | 'increase' | 'hold' | 'reduce' | 'incomplete';
 
 /** Snapshot of an exercise as performed in a session — independent of templates */
 export interface ExerciseSession {
@@ -72,6 +124,7 @@ export interface ExerciseSession {
   repMax: number;
   restSec: number;
   increment: number;
+  targetRir?: number;
   /** what the app recommended at session start */
   suggestedWeight: number;
   /** working weight actually in use (user can override) */
@@ -79,6 +132,8 @@ export interface ExerciseSession {
   sets: SetRecord[];
   substitutedFor?: string; // name of the originally planned exercise
   result?: ExerciseResult; // computed when session completes
+  /** optional one-tap RIR after the final prescribed set */
+  finalSetRir?: number;
 }
 
 export interface WorkoutSession {
@@ -92,10 +147,16 @@ export interface WorkoutSession {
   exercises: ExerciseSession[];
 }
 
+export type BoxingSessionType = 'technical' | 'bag' | 'sparring' | 'conditioning' | 'mixed';
+
 export interface BoxingAttendance {
   id: string;
   date: string; // YYYY-MM-DD
   loggedAt: number;
+  /** all optional: attendance itself is the record */
+  durationMin?: number;
+  rpe?: number;
+  sessionType?: BoxingSessionType;
 }
 
 export interface BodyMeasurement {
@@ -120,6 +181,13 @@ export interface AppSettings {
   maWindowDays: number;
   soundOn: boolean;
   vibrateOn: boolean;
+  /** body-composition goal metadata (no targets are invented by the app) */
+  goalMode?: 'cut' | null;
+  goalDate?: string;
+  goalWeightLb?: number;
+  goalWaistIn?: number;
+  /** one-time seed/migration markers so bundled plans are added exactly once */
+  seedMarkers?: string[];
 }
 
 export interface BackupFile {
@@ -135,4 +203,15 @@ export interface BackupFile {
   measurements: BodyMeasurement[];
 }
 
-export const SCHEMA_VERSION = 1;
+/** Portable plan bundle: plan + its templates + any non-library exercises it needs. Never carries history. */
+export interface PlanBundle {
+  app: 'liftdeck-plan';
+  schemaVersion: number;
+  exportedAt?: string;
+  plan: WorkoutPlan;
+  templates: WorkoutTemplate[];
+  exercises: Exercise[];
+}
+
+export const SCHEMA_VERSION = 2;
+export const PLAN_BUNDLE_VERSION = 2;

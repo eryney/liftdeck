@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { store, useAppState } from '../store/store';
-import type { DayActivity, TemplateExercise, WorkoutPlan, WorkoutTemplate } from '../types';
-import { WEEKDAY_NAMES } from '../lib/dates';
+import type { DayActivity, FixedWorkoutPlan, FlexWorkoutPlan, TemplateExercise, WeeklyGoal, WorkoutPlan, WorkoutTemplate } from '../types';
+import { WEEKDAY_NAMES, todayISO } from '../lib/dates';
 import { newId } from '../lib/ids';
 import { Confirm, Sheet } from '../components/Sheet';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { trimNum } from '../lib/format';
+import { isFlexPlan, nextRotationTemplateId, rotationGoal } from '../lib/flex';
+import { buildPlanBundle, parsePlanBundle, resolveBundle } from '../lib/planBundle';
+import type { ResolvedBundle } from '../lib/planBundle';
+import { downloadFile } from '../lib/backup';
 
 export function PlanScreen() {
   const state = useAppState();
@@ -15,6 +19,12 @@ export function PlanScreen() {
   const [renameVal, setRenameVal] = useState('');
   const [deletingPlan, setDeletingPlan] = useState(false);
   const [deletingTpl, setDeletingTpl] = useState<string | null>(null);
+  const [newPlanSheet, setNewPlanSheet] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importPending, setImportPending] = useState<ResolvedBundle | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedPlanId, setImportedPlanId] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const plan = store.activePlan();
 
@@ -23,23 +33,46 @@ export function PlanScreen() {
     if (tpl) return <TemplateEditor template={tpl} onBack={() => setEditingTemplate(null)} />;
   }
 
+  function exportPlan() {
+    if (!plan) return;
+    const bundle = buildPlanBundle(plan, store.state.templates, store.state.exercises);
+    const slug = plan.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    downloadFile(`liftdeck-plan-${slug}-${todayISO()}.json`, JSON.stringify(bundle, null, 2));
+    setNote('Plan exported. Templates and any custom exercises are included; history is not.');
+  }
+
+  async function onPlanFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const bundle = parsePlanBundle(text, store.state.exercises.map((x) => x.id));
+      const resolved = resolveBundle(bundle, { plans: store.state.plans, templates: store.state.templates, exercises: store.state.exercises });
+      setImportPending(resolved);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not read file.');
+    }
+  }
+
+  const importedPlan = importedPlanId ? state.plans.find((p) => p.id === importedPlanId) : null;
+
   return (
     <div className="screen">
       <div className="topline">CONFIGURATION</div>
       <h1 className="title">PLAN</h1>
 
       {plan ? (
-        <>
+        isFlexPlan(plan) ? (
+          <FlexPlanPanel plan={plan} onRename={() => { setRenameVal(plan.name); setRenaming(true); }} onEditTemplate={setEditingTemplate} />
+        ) : (
           <div className="panel mt16">
             <div className="spread">
-              <div style={{ fontWeight: 800, letterSpacing: '0.1em', fontSize: 17 }}>{plan.name}</div>
-              <button
-                className="btn btn--ghost btn--small"
-                onClick={() => {
-                  setRenameVal(plan.name);
-                  setRenaming(true);
-                }}
-              >
+              <div>
+                <div style={{ fontWeight: 800, letterSpacing: '0.1em', fontSize: 17 }}>{plan.name}</div>
+                <div className="tiny faint">FIXED WEEK</div>
+              </div>
+              <button className="btn btn--ghost btn--small" onClick={() => { setRenameVal(plan.name); setRenaming(true); }}>
                 RENAME
               </button>
             </div>
@@ -64,7 +97,7 @@ export function PlanScreen() {
               EDIT WEEKLY SCHEDULE
             </button>
           </div>
-        </>
+        )
       ) : (
         <div className="panel mt16 center dim small">No active plan.</div>
       )}
@@ -73,7 +106,10 @@ export function PlanScreen() {
       {state.templates.map((t) => (
         <div key={t.id} className="list-row">
           <button style={{ flex: 1, textAlign: 'left' }} onClick={() => setEditingTemplate(t.id)}>
-            <div style={{ fontWeight: 700 }}>{t.name}</div>
+            <div style={{ fontWeight: 700 }}>
+              {t.name}
+              {t.subtitle && <span className="faint"> // {t.subtitle}</span>}
+            </div>
             <div className="tiny faint">{t.exercises.length} EXERCISES · TAP TO EDIT</div>
           </button>
           <button className="btn btn--ghost btn--small red" onClick={() => setDeletingTpl(t.id)}>
@@ -96,7 +132,10 @@ export function PlanScreen() {
       <h2 className="section">PLANS</h2>
       {state.plans.map((p) => (
         <div key={p.id} className="list-row">
-          <span style={{ flex: 1 }}>{p.name}</span>
+          <span style={{ flex: 1 }}>
+            {p.name}
+            <span className="faint tiny"> · {isFlexPlan(p) ? 'FLEX' : 'FIXED'}</span>
+          </span>
           {p.id === state.settings.activePlanId ? (
             <span className="cyan tiny">ACTIVE</span>
           ) : (
@@ -107,20 +146,7 @@ export function PlanScreen() {
         </div>
       ))}
       <div className="row mt8" style={{ gap: 8 }}>
-        <button
-          className="btn btn--ghost"
-          style={{ flex: 1 }}
-          onClick={() => {
-            const p: WorkoutPlan = {
-              id: newId('plan'),
-              name: 'NEW PLAN',
-              schedule: Array.from({ length: 7 }, () => ({ type: 'rest' as const })),
-            };
-            store.savePlan(p);
-            store.updateSettings({ activePlanId: p.id });
-            setEditingSchedule(true);
-          }}
-        >
+        <button className="btn btn--ghost" style={{ flex: 1 }} onClick={() => setNewPlanSheet(true)}>
           + NEW PLAN
         </button>
         {plan && state.plans.length > 1 && (
@@ -128,6 +154,22 @@ export function PlanScreen() {
             DELETE ACTIVE PLAN
           </button>
         )}
+      </div>
+
+      <h2 className="section">PLAN FILES</h2>
+      <div className="panel">
+        <div className="tiny dim" style={{ lineHeight: 1.6 }}>
+          Share or move a program without touching history. A plan file carries the plan, its templates and any custom exercises. Importing only adds; it never wipes anything.
+        </div>
+        <div className="row mt16" style={{ gap: 8 }}>
+          <button className="btn" style={{ flex: 1 }} disabled={!plan} onClick={exportPlan}>
+            EXPORT PLAN
+          </button>
+          <button className="btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
+            IMPORT PLAN…
+          </button>
+        </div>
+        <input ref={fileRef} type="file" accept="application/json,.json" hidden onChange={onPlanFile} aria-label="plan file" />
       </div>
 
       {renaming && plan && (
@@ -147,7 +189,54 @@ export function PlanScreen() {
         </Sheet>
       )}
 
-      {editingSchedule && plan && <ScheduleEditor plan={plan} onClose={() => setEditingSchedule(false)} />}
+      {editingSchedule && plan && !isFlexPlan(plan) && <ScheduleEditor plan={plan} onClose={() => setEditingSchedule(false)} />}
+
+      {newPlanSheet && (
+        <Sheet onClose={() => setNewPlanSheet(false)}>
+          <div className="tiny faint">NEW PLAN</div>
+          <button
+            className="btn mt16"
+            style={{ width: '100%' }}
+            onClick={() => {
+              const rot = state.templates.slice(0, 2).map((t) => t.id);
+              const p: FlexWorkoutPlan = {
+                id: newId('plan'),
+                name: 'NEW FLEX PLAN',
+                mode: 'flex',
+                weeklyGoals: [
+                  { id: newId('goal'), kind: 'boxing', minimum: 2, target: 4 },
+                  ...(rot.length ? [{ id: newId('goal'), kind: 'rotation' as const, templateIds: rot, minimum: 1, target: 2, max: 2, minGapHours: 36 }] : []),
+                ],
+              };
+              store.savePlan(p);
+              store.updateSettings({ activePlanId: p.id });
+              setNewPlanSheet(false);
+            }}
+          >
+            FLEX · WEEKLY TARGETS
+          </button>
+          <div className="tiny faint mt8">Minimums and targets per week. No weekdays. A/B rotation continues across weeks.</div>
+          <button
+            className="btn mt16"
+            style={{ width: '100%' }}
+            onClick={() => {
+              const p: FixedWorkoutPlan = {
+                id: newId('plan'),
+                name: 'NEW PLAN',
+                mode: 'fixed',
+                schedule: Array.from({ length: 7 }, () => ({ type: 'rest' as const })),
+              };
+              store.savePlan(p);
+              store.updateSettings({ activePlanId: p.id });
+              setNewPlanSheet(false);
+              setEditingSchedule(true);
+            }}
+          >
+            FIXED · WEEKDAY SCHEDULE
+          </button>
+          <div className="tiny faint mt8">Classic Monday–Sunday plan with missed-day tracking.</div>
+        </Sheet>
+      )}
 
       {deletingPlan && plan && (
         <Confirm
@@ -166,7 +255,7 @@ export function PlanScreen() {
       {deletingTpl && (
         <Confirm
           title={`Delete template "${state.templates.find((t) => t.id === deletingTpl)?.name}"?`}
-          body="Past workouts are kept. Scheduled days using it become rest days."
+          body="Past workouts are kept. Plans that use it drop the reference."
           confirmLabel="DELETE"
           danger
           onConfirm={() => {
@@ -176,11 +265,285 @@ export function PlanScreen() {
           onCancel={() => setDeletingTpl(null)}
         />
       )}
+
+      {importError && (
+        <Sheet onClose={() => setImportError(null)}>
+          <div className="red small">PLAN IMPORT FAILED</div>
+          <div className="small mt8" style={{ lineHeight: 1.6 }}>{importError}</div>
+          <button className="btn btn--ghost mt16" style={{ width: '100%' }} onClick={() => setImportError(null)}>
+            OK
+          </button>
+        </Sheet>
+      )}
+
+      {importPending && (
+        <Sheet onClose={() => setImportPending(null)}>
+          <div className="tiny faint">IMPORT PLAN</div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{importPending.plan.name}</div>
+          <div className="small dim mt8">
+            Adds {importPending.templates.length} template{importPending.templates.length === 1 ? '' : 's'}
+            {importPending.exercises.length ? ` and ${importPending.exercises.length} exercise definition${importPending.exercises.length === 1 ? '' : 's'}` : ''}.
+            Nothing existing is changed or removed.
+          </div>
+          {importPending.notes.map((n, i) => (
+            <div key={i} className="tiny faint mt8">· {n}</div>
+          ))}
+          <div className="row mt16" style={{ gap: 10 }}>
+            <button className="btn btn--ghost" style={{ flex: 1 }} onClick={() => setImportPending(null)}>
+              CANCEL
+            </button>
+            <button
+              className="btn btn--primary"
+              style={{ flex: 2, minHeight: 52 }}
+              onClick={async () => {
+                const r = importPending;
+                setImportPending(null);
+                const id = await store.importPlanBundle(r);
+                setImportedPlanId(id);
+              }}
+            >
+              IMPORT
+            </button>
+          </div>
+        </Sheet>
+      )}
+
+      {importedPlan && (
+        <Sheet onClose={() => setImportedPlanId(null)}>
+          <div className="green small">PLAN IMPORTED</div>
+          <div style={{ fontSize: 18, fontWeight: 800, marginTop: 6 }}>{importedPlan.name}</div>
+          <div className="tiny faint mt8">Your history, body measurements and boxing log are exactly as they were.</div>
+          <button
+            className="btn btn--primary mt16"
+            onClick={() => {
+              store.updateSettings({ activePlanId: importedPlan.id });
+              setImportedPlanId(null);
+            }}
+          >
+            ACTIVATE PLAN
+          </button>
+          <button className="btn btn--ghost mt8" style={{ width: '100%' }} onClick={() => setImportedPlanId(null)}>
+            KEEP CURRENT PLAN
+          </button>
+        </Sheet>
+      )}
+
+      {note && (
+        <Sheet onClose={() => setNote(null)}>
+          <div className="green small">{note}</div>
+          <button className="btn btn--ghost mt16" style={{ width: '100%' }} onClick={() => setNote(null)}>
+            OK
+          </button>
+        </Sheet>
+      )}
     </div>
   );
 }
 
-function ScheduleEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => void }) {
+// ── FLEX plan panel + editor ──────────────────────────────────────────────
+
+function Stepper({ value, min, max, step = 1, onChange, label }: { value: number; min: number; max?: number; step?: number; onChange: (v: number) => void; label: string }) {
+  return (
+    <div className="stepper" aria-label={label}>
+      <button style={{ width: 40, height: 40, fontSize: 18 }} onClick={() => onChange(Math.max(min, value - step))} aria-label={`${label} decrease`}>−</button>
+      <span style={{ minWidth: 34, textAlign: 'center', fontWeight: 800, fontSize: 16 }}>{trimNum(value)}</span>
+      <button style={{ width: 40, height: 40, fontSize: 18 }} onClick={() => onChange(max != null ? Math.min(max, value + step) : value + step)} aria-label={`${label} increase`}>+</button>
+    </div>
+  );
+}
+
+function FlexPlanPanel({ plan, onRename, onEditTemplate }: { plan: FlexWorkoutPlan; onRename: () => void; onEditTemplate: (id: string) => void }) {
+  const state = useAppState();
+  const [editing, setEditing] = useState(false);
+  const rot = rotationGoal(plan);
+  const next = rot ? nextRotationTemplateId(rot, state.sessions) : null;
+
+  return (
+    <div className="panel mt16">
+      <div className="spread">
+        <div>
+          <div style={{ fontWeight: 800, letterSpacing: '0.1em', fontSize: 17 }}>{plan.name} // FLEX</div>
+          <div className="tiny faint">WEEKLY TARGETS · NO WEEKDAYS</div>
+        </div>
+        <button className="btn btn--ghost btn--small" onClick={onRename}>RENAME</button>
+      </div>
+
+      {plan.weeklyGoals.map((g) => (
+        <div key={g.id} className="mt16">
+          <div className="spread">
+            <span className="small" style={{ fontWeight: 700, letterSpacing: '0.16em' }}>
+              {g.kind === 'boxing' ? 'BOXING' : g.kind === 'rotation' ? 'STRENGTH' : g.optional ? 'OPTIONAL' : 'WORKOUT'}
+              {g.kind === 'workout' && (
+                <span className="faint"> · {store.templateById(g.templateId)?.name ?? '?'}{store.templateById(g.templateId)?.subtitle ? ` // ${store.templateById(g.templateId)?.subtitle}` : ''}</span>
+              )}
+            </span>
+            <span className="tiny dim">
+              {g.kind === 'workout' && g.optional ? `${g.minimum}–${g.max ?? g.target}` : `minimum ${g.minimum} · target ${g.target}${g.max != null ? ` · max ${g.max}` : ''}`}
+            </span>
+          </div>
+          {g.kind === 'rotation' && (
+            <div className="tiny faint mt8">
+              {g.templateIds.map((id, i) => (
+                <span key={id}>
+                  {i > 0 && <span> ↔ </span>}
+                  <button className={id === next ? 'cyan' : 'dim'} style={{ textDecoration: 'underline dotted' }} onClick={() => onEditTemplate(id)}>
+                    {String.fromCharCode(65 + i)} · {store.templateById(id)?.name ?? '?'}
+                  </button>
+                </span>
+              ))}
+              {next && <span> · next: {String.fromCharCode(65 + g.templateIds.indexOf(next))}</span>}
+              {g.minGapHours != null && <span> · ≥{g.minGapHours}h apart</span>}
+            </div>
+          )}
+        </div>
+      ))}
+
+      <button className="btn btn--ghost mt16" style={{ width: '100%' }} onClick={() => setEditing(true)}>
+        EDIT WEEKLY TARGETS
+      </button>
+      {editing && <FlexGoalsEditor plan={plan} onClose={() => setEditing(false)} />}
+    </div>
+  );
+}
+
+function FlexGoalsEditor({ plan, onClose }: { plan: FlexWorkoutPlan; onClose: () => void }) {
+  const state = useAppState();
+  function setGoal(id: string, patch: Partial<WeeklyGoal>) {
+    store.savePlan({
+      ...plan,
+      weeklyGoals: plan.weeklyGoals.map((g) => (g.id === id ? ({ ...g, ...patch } as WeeklyGoal) : g)),
+    });
+  }
+  function removeGoal(id: string) {
+    store.savePlan({ ...plan, weeklyGoals: plan.weeklyGoals.filter((g) => g.id !== id) });
+  }
+  const hasBoxing = plan.weeklyGoals.some((g) => g.kind === 'boxing');
+  const hasRotation = plan.weeklyGoals.some((g) => g.kind === 'rotation');
+
+  return (
+    <Sheet onClose={onClose}>
+      <div className="tiny faint">WEEKLY TARGETS · {plan.name}</div>
+      <div style={{ maxHeight: '62dvh', overflowY: 'auto' }}>
+        {plan.weeklyGoals.map((g) => (
+          <div key={g.id} className="panel mt8">
+            <div className="spread">
+              <span className="small" style={{ fontWeight: 700, letterSpacing: '0.14em' }}>
+                {g.kind === 'boxing' ? 'BOXING' : g.kind === 'rotation' ? 'STRENGTH · ROTATION' : g.optional ? 'OPTIONAL' : 'WORKOUT'}
+              </span>
+              <button className="btn btn--ghost btn--small red" onClick={() => removeGoal(g.id)} aria-label="remove goal">×</button>
+            </div>
+            <div className="spread mt8">
+              <span className="small dim">MINIMUM / WEEK</span>
+              <Stepper label={`${g.kind} minimum`} value={g.minimum} min={0} max={g.target} onChange={(v) => setGoal(g.id, { minimum: v })} />
+            </div>
+            <div className="spread mt8">
+              <span className="small dim">TARGET / WEEK</span>
+              <Stepper label={`${g.kind} target`} value={g.target} min={Math.max(g.minimum, 0)} max={14} onChange={(v) => setGoal(g.id, { target: v, ...(g.max != null && g.max < v ? { max: v } : {}) })} />
+            </div>
+            <div className="spread mt8">
+              <span className="small dim">SOFT MAX {g.max == null ? '(off)' : ''}</span>
+              <div className="row" style={{ gap: 6 }}>
+                {g.max != null ? (
+                  <>
+                    <Stepper label={`${g.kind} max`} value={g.max} min={g.target} max={14} onChange={(v) => setGoal(g.id, { max: v })} />
+                    <button className="chip" onClick={() => setGoal(g.id, { max: undefined })}>OFF</button>
+                  </>
+                ) : (
+                  <button className="chip" onClick={() => setGoal(g.id, { max: g.target })}>SET</button>
+                )}
+              </div>
+            </div>
+            {g.kind === 'rotation' && (
+              <>
+                <div className="spread mt8">
+                  <span className="small dim">MIN GAP (HOURS)</span>
+                  <Stepper label="min gap hours" value={g.minGapHours ?? 36} min={0} max={96} step={6} onChange={(v) => setGoal(g.id, { minGapHours: v })} />
+                </div>
+                <div className="tiny faint mt8">ROTATION ORDER</div>
+                {g.templateIds.map((tid, i) => (
+                  <div key={`${tid}-${i}`} className="row mt8" style={{ gap: 8 }}>
+                    <span className="faint tiny" style={{ width: 16 }}>{String.fromCharCode(65 + i)}</span>
+                    <select
+                      value={tid}
+                      aria-label={`rotation slot ${String.fromCharCode(65 + i)}`}
+                      onChange={(e) => setGoal(g.id, { templateIds: g.templateIds.map((x, j) => (j === i ? e.target.value : x)) })}
+                    >
+                      {state.templates.map((t) => (
+                        <option key={t.id} value={t.id}>{t.name}{t.subtitle ? ` // ${t.subtitle}` : ''}</option>
+                      ))}
+                    </select>
+                    <button className="btn btn--ghost btn--small" disabled={g.templateIds.length <= 1} onClick={() => setGoal(g.id, { templateIds: g.templateIds.filter((_, j) => j !== i) })} aria-label="remove slot">×</button>
+                  </div>
+                ))}
+                <button
+                  className="btn btn--ghost btn--small mt8"
+                  style={{ width: '100%' }}
+                  disabled={state.templates.length === 0}
+                  onClick={() => setGoal(g.id, { templateIds: [...g.templateIds, state.templates[0].id] })}
+                >
+                  + ADD SLOT
+                </button>
+              </>
+            )}
+            {g.kind === 'workout' && (
+              <>
+                <div className="row mt8" style={{ gap: 8 }}>
+                  <select value={g.templateId} aria-label="goal template" onChange={(e) => setGoal(g.id, { templateId: e.target.value })}>
+                    {state.templates.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}{t.subtitle ? ` // ${t.subtitle}` : ''}</option>
+                    ))}
+                  </select>
+                  <button className={`chip ${g.optional ? 'on' : ''}`} onClick={() => setGoal(g.id, { optional: !g.optional || undefined })}>
+                    OPT
+                  </button>
+                </div>
+                <div className="tiny faint mt8">Optional goals never count toward FOUNDATION or TARGET.</div>
+              </>
+            )}
+          </div>
+        ))}
+        <div className="row mt8" style={{ gap: 8, flexWrap: 'wrap' }}>
+          {!hasBoxing && (
+            <button className="btn btn--ghost btn--small" onClick={() => store.savePlan({ ...plan, weeklyGoals: [...plan.weeklyGoals, { id: newId('goal'), kind: 'boxing' as const, minimum: 2, target: 4 }] })}>
+              + BOXING
+            </button>
+          )}
+          {!hasRotation && state.templates.length > 0 && (
+            <button
+              className="btn btn--ghost btn--small"
+              onClick={() =>
+                store.savePlan({
+                  ...plan,
+                  weeklyGoals: [...plan.weeklyGoals, { id: newId('goal'), kind: 'rotation' as const, templateIds: state.templates.slice(0, 2).map((t) => t.id), minimum: 1, target: 2, max: 2, minGapHours: 36 }],
+                })
+              }
+            >
+              + ROTATION
+            </button>
+          )}
+          {state.templates.length > 0 && (
+            <button
+              className="btn btn--ghost btn--small"
+              onClick={() =>
+                store.savePlan({
+                  ...plan,
+                  weeklyGoals: [...plan.weeklyGoals, { id: newId('goal'), kind: 'workout' as const, templateId: state.templates[state.templates.length - 1].id, minimum: 0, target: 1, max: 1, optional: true }],
+                })
+              }
+            >
+              + OPTIONAL WORKOUT
+            </button>
+          )}
+        </div>
+      </div>
+      <button className="btn btn--primary mt16" onClick={onClose}>DONE</button>
+    </Sheet>
+  );
+}
+
+// ── LEGACY fixed schedule editor ──────────────────────────────────────────
+
+function ScheduleEditor({ plan, onClose }: { plan: FixedWorkoutPlan; onClose: () => void }) {
   function setDay(i: number, a: DayActivity) {
     store.savePlan({ ...plan, schedule: plan.schedule.map((d, j) => (j === i ? a : d)) });
   }
@@ -231,6 +594,8 @@ function ScheduleEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => v
   );
 }
 
+// ── template editor ───────────────────────────────────────────────────────
+
 function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBack: () => void }) {
   const state = useAppState();
   const tpl = state.templates.find((t) => t.id === template.id) ?? template;
@@ -238,6 +603,7 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
   const [configuring, setConfiguring] = useState<string | null>(null);
   const [swapping, setSwapping] = useState<string | null>(null);
   const [name, setName] = useState(tpl.name);
+  const [subtitle, setSubtitle] = useState(tpl.subtitle ?? '');
 
   function save(exercises: TemplateExercise[]) {
     store.saveTemplate({ ...tpl, exercises });
@@ -269,6 +635,15 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
         aria-label="template name"
         style={{ fontWeight: 800, letterSpacing: '0.08em', fontSize: 18 }}
       />
+      <input
+        className="mt8"
+        value={subtitle}
+        placeholder="subtitle (e.g. FULL BODY)"
+        onChange={(e) => setSubtitle(e.target.value)}
+        onBlur={() => store.saveTemplate({ ...tpl, subtitle: subtitle.trim() ? subtitle.trim().toUpperCase() : undefined })}
+        aria-label="template subtitle"
+      />
+      <div className="tiny faint mt8">Editing a template changes future sessions only. Past workouts are snapshots and never change.</div>
 
       {tpl.exercises.map((te, i) => {
         const ex = store.exerciseById(te.exerciseId);
@@ -285,7 +660,10 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
             <button style={{ flex: 1, textAlign: 'left' }} onClick={() => setConfiguring(te.id)}>
               <div>{ex?.name ?? te.exerciseId}</div>
               <div className="tiny faint">
-                {te.sets} × {te.repMin}–{te.repMax} · +{trimNum(te.increment)} · rest {te.restSec}s
+                {te.sets} × {te.repMin}–{te.repMax}
+                {ex?.perSide ? ' / side' : ''} · +{trimNum(te.increment)}
+                {ex?.perHand ? '/hand' : ex?.bodyweight ? ' added' : ''} · rest {te.restSec}s
+                {te.targetRir != null ? ` · RIR ${te.targetRir}` : ''}
               </div>
             </button>
             <button
@@ -312,12 +690,13 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
               {
                 id: newId('te'),
                 exerciseId: ex.id,
-                sets: 3,
-                repMin: 8,
-                repMax: 15,
+                sets: ex.compound ? 3 : 2,
+                repMin: ex.compound ? 6 : 10,
+                repMax: ex.compound ? 10 : 15,
                 restSec: ex.compound ? settings.compoundRestSec : settings.isolationRestSec,
-                increment: settings.defaultIncrement,
+                increment: ex.equipment === 'dumbbell' && ex.compound && ['Chest', 'Shoulders', 'Back'].includes(ex.category) ? 2.5 : ex.equipment === 'cable' || ex.bodyweight ? 2.5 : settings.defaultIncrement,
                 startWeight: 0,
+                targetRir: ex.compound ? 2 : 1,
               },
             ]);
             setAdding(false);
@@ -344,6 +723,7 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
       {swapping && (
         <ExercisePicker
           title="SWAP EXERCISE"
+          forExerciseId={tpl.exercises.find((x) => x.id === swapping)?.exerciseId}
           onPick={(ex) => {
             save(tpl.exercises.map((x) => (x.id === swapping ? { ...x, exerciseId: ex.id } : x)));
             setSwapping(null);
@@ -368,25 +748,30 @@ function ExerciseConfigSheet({
 }) {
   const [v, setV] = useState(te);
   const ex = store.exerciseById(te.exerciseId);
-  const num = (label: string, key: keyof TemplateExercise, step = 1, min = 0) => (
+  const num = (label: string, key: 'sets' | 'repMin' | 'repMax' | 'restSec' | 'increment' | 'startWeight' | 'targetRir', step = 1, min = 0, hint?: string) => (
     <div className="spread mt8">
-      <span className="small dim">{label}</span>
+      <span className="small dim">
+        {label}
+        {hint && <div className="tiny faint">{hint}</div>}
+      </span>
       <div className="stepper">
         <button
           style={{ width: 44, height: 44 }}
-          onClick={() => setV({ ...v, [key]: Math.max(min, (v[key] as number) - step) })}
+          onClick={() => setV({ ...v, [key]: Math.max(min, ((v[key] as number | undefined) ?? 0) - step) })}
+          aria-label={`${label} decrease`}
         >
           −
         </button>
         <span style={{ minWidth: 56, textAlign: 'center', fontWeight: 800, fontSize: 17 }}>
-          {trimNum(v[key] as number)}
+          {v[key] == null ? '—' : trimNum(v[key] as number)}
         </span>
-        <button style={{ width: 44, height: 44 }} onClick={() => setV({ ...v, [key]: (v[key] as number) + step })}>
+        <button style={{ width: 44, height: 44 }} onClick={() => setV({ ...v, [key]: ((v[key] as number | undefined) ?? 0) + step })} aria-label={`${label} increase`}>
           +
         </button>
       </div>
     </div>
   );
+  const incHint = ex?.bodyweight ? 'ADDED load, total' : ex?.perHand ? 'PER HAND (each dumbbell)' : ex?.equipment === 'cable' ? 'smallest practical stack step' : undefined;
   return (
     <Sheet onClose={onClose}>
       <div className="tiny faint">CONFIGURE</div>
@@ -395,8 +780,9 @@ function ExerciseConfigSheet({
       {num('REP MIN', 'repMin', 1, 1)}
       {num('REP MAX', 'repMax', 1, 1)}
       {num('REST (SEC)', 'restSec', 15, 15)}
-      {num('INCREMENT (LB)', 'increment', 2.5, 2.5)}
-      {num(ex?.bodyweight ? 'START ADDED WT' : 'START WEIGHT', 'startWeight', 5, 0)}
+      {num('INCREMENT (LB)', 'increment', 1.25, 1.25, incHint)}
+      {num(ex?.bodyweight ? 'START ADDED WT' : ex?.perHand ? 'START WEIGHT / HAND' : 'START WEIGHT', 'startWeight', 2.5, 0)}
+      {num('TARGET RIR', 'targetRir', 1, 0, 'reps in reserve · telemetry only')}
       <div className="row mt16" style={{ gap: 10 }}>
         <button className="btn btn--ghost" style={{ flex: 1 }} onClick={onSwap}>
           SWAP EXERCISE
@@ -412,3 +798,5 @@ function ExerciseConfigSheet({
     </Sheet>
   );
 }
+
+export type { WorkoutPlan };

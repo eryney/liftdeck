@@ -1,13 +1,13 @@
 # LIFTDECK
 
-A personal workout-tracking PWA: StrongLifts-style progression for a dumbbell/cable home gym, one-tap class attendance, and a calendar that keeps you honest. 1980s terminal aesthetic. All data lives on your device.
+A personal training PWA for a boxer who lifts. Boxing is the sport; two short full-body strength sessions keep strength and muscle while cutting. Weeks are judged on totals, never on which weekday something happened. 1980s terminal aesthetic. All data lives on your device.
 
-Ships with a default hybrid program (**PROGRAM 01**: boxing attendance Mon/Wed/Sat/Sun, Strength A Tue, Strength B Thu, optional accessory work Fri), fully editable under PLAN.
+Ships with **BOXER CUT // FLEX**: boxing minimum 2 / target 4 per week, strength minimum 1 / target 2 per week as an A ↔ B full-body rotation, plus an optional upper + abs session that never affects adherence. The legacy fixed-weekday plan (**PROGRAM 01**) still works for anyone who has one.
 
 ## Stack
 
 - React 18 + TypeScript + Vite
-- IndexedDB (via `idb`) for all persistence, with schema versioning
+- IndexedDB (via `idb`) for all persistence, with an app-level schema version (currently 2)
 - `vite-plugin-pwa` service worker: fully offline after first load
 - No server, no accounts, no external services. Charts are hand-rolled SVG.
 
@@ -23,11 +23,11 @@ Open the printed URL. `npm run dev -- --host` exposes it on your LAN so you can 
 ## Tests
 
 ```
-npm test        # unit tests: progression, adherence, backup/CSV (vitest)
+npm test        # unit tests (vitest): progression, flex adherence, recommendation engine, body trends, boxing, strength trends, plan bundles, backup/migration, store
 npm run e2e     # end-to-end flows in Chromium (playwright; run `npx playwright install chromium` once)
 ```
 
-The e2e suite covers the full loop: onboarding → workout → rep logging → rest timer → completion → progression suggestion, plus boxing, body weight, persistence across reloads, and backup export/wipe/import.
+The e2e suite covers onboarding → workout → rep logging → rest timer → RIR prompt → completion → progression suggestion, boxing one-tap + details, body weight/waist trends, persistence across reloads, backup export/wipe/import, in-place migration of a v1 install, plan import/export, and offline use.
 
 ## Build + deploy
 
@@ -49,13 +49,29 @@ npm run build   # outputs dist/ (regenerates icons, typechecks, bundles, builds 
 
 Because storage is per-origin, install from the URL you plan to keep. iOS can evict storage for sites you never visit; a Home Screen app you open regularly is safe, but export a backup now and then (Settings → EXPORT BACKUP). Restore it anytime with IMPORT BACKUP, including on a new phone.
 
+## How the program logic works
+
+**Flex plans** (`mode: 'flex'`) have weekly goals instead of a weekday schedule. Each week (Mon–Sun) is a FOUNDATION week when every non-optional goal hits its minimum, and a TARGET week when every one hits its target. There is no "missed Wednesday". The A/B rotation is driven by the most recently completed A or B session and never resets on Monday.
+
+**Recommendation engine** (`src/lib/recommend.ts`) is a fixed rule list, in order: strength floor (0 this week and ≥36h since the last lift) → boxing below minimum → second strength exposure (rested) → boxing toward target → optional session (only once A+B are done, boxing is at its minimum, and no hard boxing in the last 24h) → recovery. Boxing is always available; nothing is ever blocked. Under 36h since a lift, or hard boxing (RPE ≥ 8 or ≥30 min sparring) in the last 24h, shows a note.
+
+**Double progression** (`src/lib/progression.ts`): only the prescribed sets count. Every prescribed set at repMax → INCREASE by the slot's increment. Otherwise HOLD (not a failure). REDUCE is suggested only after two consecutive complete exposures at the same load with a prescribed set below repMin; an incomplete exposure, a load change, or a clean exposure in between resets that. Suggestions derive from the load actually lifted, so manual overrides are respected. RIR is optional telemetry and never affects progression.
+
+**Body** (`src/lib/body.ts`): raw weight, 7-day moving average, 7-day and 4-week change of the average, and a regression-based lb/week and %/week trend over the trailing 28 days. Waist is a first-class graph. No body-fat estimates, no calorie advice.
+
+**Strength maintenance** (`src/lib/strength.ts`): estimated 1RM (Epley, 1–12 rep sets only), rolling mean of the last 3 exposures vs the 3 before. Labels are IMPROVING / MAINTAINED / TRENDING DOWN, and TRENDING DOWN needs a persistent decline. Bodyweight lifts use total system load (bodyweight + added) when a weigh-in is within a week.
+
 ## Where things live
 
-- `src/lib/progression.ts` — the progression rule: all prescribed sets at the top of the rep range → +increment next time; otherwise keep the weight. Suggestions derive from what you actually lifted last session, so manual overrides and history edits are respected automatically.
-- `src/lib/adherence.ts` — calendar day status, weekly/monthly stats, streak. Optional sessions never count against you.
-- `src/data/seedPlan.ts` / `src/data/exercises.ts` — the default plan and the ~95-exercise library.
+- `src/data/seedPlan.ts` — BOXER CUT // FLEX templates + plan, and the legacy PROGRAM 01 seed (for migration detection).
+- `src/lib/flex.ts` — weekly attainment, foundation streak, rotation, calendar training record.
+- `src/lib/adherence.ts` — legacy weekday adherence for fixed plans only.
+- `src/lib/planBundle.ts` — `liftdeck-plan` export/import with validation and collision handling. Import only adds.
+- `src/lib/migrate.ts` + `Store.migrateExisting` — v1 → v2 migration; adds the flex plan once and activates it only if the untouched default plan was active.
 - `src/store/store.ts` — in-memory state with write-through persistence to IndexedDB; every logged set is saved immediately.
 - Session records are snapshots: editing a template later never rewrites history.
+
+`boxer-cut-flex.liftdeck-plan.json` is the importable plan bundle (regenerate with `npx vite-node scripts/plan-bundle.ts`).
 
 ## Resetting to a clean state
 

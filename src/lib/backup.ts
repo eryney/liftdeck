@@ -1,7 +1,9 @@
-import type { BackupFile } from '../types';
+import type { BackupFile, BoxingAttendance } from '../types';
 import { SCHEMA_VERSION } from '../types';
 import type { DBShape } from './db';
 import { defaultSettings } from './db';
+import { migrateBackup } from './migrate';
+import { boxingLoad } from './boxing';
 
 export function buildBackup(data: DBShape): BackupFile {
   return {
@@ -18,6 +20,7 @@ export function buildBackup(data: DBShape): BackupFile {
   };
 }
 
+/** Parses and migrates a backup file (v1 and v2). Throws readable errors. */
 export function parseBackup(text: string): BackupFile {
   let obj: unknown;
   try {
@@ -34,8 +37,7 @@ export function parseBackup(text: string): BackupFile {
     if (!Array.isArray(b[key])) throw new Error(`Backup is missing "${key}".`);
   }
   if (!b.settings || typeof b.settings !== 'object') throw new Error('Backup is missing settings.');
-  // future: migrate older schemaVersions here
-  return b as BackupFile;
+  return migrateBackup(b as BackupFile);
 }
 
 function csvEscape(v: unknown): string {
@@ -44,7 +46,7 @@ function csvEscape(v: unknown): string {
 }
 
 export function sessionsToCSV(sessions: BackupFile['sessions']): string {
-  const rows: string[] = ['date,workout,exercise,set,weight_lb,reps,result'];
+  const rows: string[] = ['date,workout,exercise,set,weight_lb,reps,result,prescribed,final_set_rir'];
   const sorted = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
   for (const s of sorted) {
     if (s.status !== 'completed') continue;
@@ -52,7 +54,11 @@ export function sessionsToCSV(sessions: BackupFile['sessions']): string {
       es.sets.forEach((set, i) => {
         if (set.reps == null) return;
         rows.push(
-          [s.date, s.name, es.name, i + 1, set.weight, set.reps, es.result ?? ''].map(csvEscape).join(','),
+          [
+            s.date, s.name, es.name, i + 1, set.weight, set.reps, es.result ?? '',
+            i < es.targetSets ? 'yes' : 'extra',
+            i === es.targetSets - 1 && es.finalSetRir != null ? es.finalSetRir : '',
+          ].map(csvEscape).join(','),
         );
       });
     }
@@ -64,6 +70,15 @@ export function measurementsToCSV(measurements: BackupFile['measurements']): str
   const rows = ['date,weight_lb,waist_in'];
   const sorted = [...measurements].sort((a, b) => (a.date < b.date ? -1 : 1));
   for (const m of sorted) rows.push([m.date, m.weightLb, m.waistIn ?? ''].map(csvEscape).join(','));
+  return rows.join('\n');
+}
+
+export function boxingToCSV(boxing: BoxingAttendance[]): string {
+  const rows = ['date,session_type,duration_min,rpe,load'];
+  const sorted = [...boxing].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.loggedAt - b.loggedAt));
+  for (const b of sorted) {
+    rows.push([b.date, b.sessionType ?? '', b.durationMin ?? '', b.rpe ?? '', boxingLoad(b) ?? ''].map(csvEscape).join(','));
+  }
   return rows.join('\n');
 }
 

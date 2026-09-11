@@ -3,6 +3,7 @@ import { Sheet } from './Sheet';
 import type { Category, Exercise } from '../types';
 import { store, useAppState } from '../store/store';
 import { newId } from '../lib/ids';
+import { SUGGESTED_SUBSTITUTES } from '../data/substitutions';
 
 const CATEGORIES: Category[] = [
   'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads',
@@ -12,10 +13,13 @@ const CATEGORIES: Category[] = [
 /** Searchable exercise picker with inline custom-exercise creation. */
 export function ExercisePicker({
   title = 'CHOOSE EXERCISE',
+  forExerciseId,
   onPick,
   onClose,
 }: {
   title?: string;
+  /** when substituting: suggested substitutes for this exercise are listed first */
+  forExerciseId?: string;
   onPick: (exercise: Exercise) => void;
   onClose: () => void;
 }) {
@@ -26,6 +30,13 @@ export function ExercisePicker({
   const [newCat, setNewCat] = useState<Category>('Other');
   const [newEquip, setNewEquip] = useState<Exercise['equipment']>('dumbbell');
   const [newBW, setNewBW] = useState(false);
+
+  const suggested = useMemo(() => {
+    if (!forExerciseId || q.trim()) return [];
+    return (SUGGESTED_SUBSTITUTES[forExerciseId] ?? [])
+      .map((id) => state.exercises.find((e) => e.id === id))
+      .filter((e): e is Exercise => !!e);
+  }, [forExerciseId, q, state.exercises]);
 
   const results = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -68,6 +79,20 @@ export function ExercisePicker({
             />
           </div>
           <div style={{ maxHeight: '45dvh', overflowY: 'auto', marginTop: 8 }}>
+            {suggested.length > 0 && (
+              <>
+                <div className="tiny faint mt8">SUGGESTED SUBSTITUTES</div>
+                {suggested.map((e) => (
+                  <button key={`s-${e.id}`} className="list-row" onClick={() => onPick(e)}>
+                    <div style={{ flex: 1 }}>
+                      <div className="cyan">{e.name}</div>
+                      <div className="tiny faint">{e.category.toUpperCase()} · {e.equipment.toUpperCase()}</div>
+                    </div>
+                  </button>
+                ))}
+                <div className="tiny faint mt16">ALL EXERCISES</div>
+              </>
+            )}
             {results.map((e) => (
               <button key={e.id} className="list-row" onClick={() => onPick(e)}>
                 <div style={{ flex: 1 }}>

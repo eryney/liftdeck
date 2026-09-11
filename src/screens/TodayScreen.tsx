@@ -5,18 +5,310 @@ import { weekPlanStats, currentStreak } from '../lib/adherence';
 import { fmtWeightShort } from '../lib/format';
 import { unlockAudio } from '../lib/sound';
 import { Sheet } from '../components/Sheet';
-import { movingAverage } from '../lib/progression';
+import { GoalBar } from '../components/GoalBar';
+import { BoxingDetailsSheet } from '../components/BoxingDetails';
+import { weightTrend } from '../lib/body';
+import { foundationStreak, isFlexPlan, targetWeeks, weekAttainment } from '../lib/flex';
+import { recommend } from '../lib/recommend';
+import { boxingWeekStats } from '../lib/boxing';
+import { isIncrease } from '../lib/progression';
+import type { FixedWorkoutPlan, FlexWorkoutPlan, WorkoutTemplate } from '../types';
 
 export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: string) => void }) {
+  const plan = store.activePlan();
+  if (plan && isFlexPlan(plan)) return <FlexToday plan={plan} onOpenWorkout={onOpenWorkout} />;
+  return <FixedToday plan={plan} onOpenWorkout={onOpenWorkout} />;
+}
+
+function templateTitle(t: WorkoutTemplate | undefined, fallback = 'WORKOUT'): string {
+  if (!t) return fallback;
+  return t.subtitle ? `${t.name} // ${t.subtitle}` : t.name;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// FLEX plan: weekly attainment + recommendation, no weekday judgement
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorkout: (id: string) => void }) {
   const state = useAppState();
   const [pickTemplate, setPickTemplate] = useState(false);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null); // boxing record id
+  const today = todayISO();
+  const active = store.activeSession();
+
+  const ctx = { plan, sessions: state.sessions, boxing: state.boxing, startDate: state.settings.startDate, today };
+  const week = useMemo(() => weekAttainment(ctx, today, state.templates), [plan, state.sessions, state.boxing, state.templates, today]);
+  const rec = useMemo(
+    () => recommend({ plan, sessions: state.sessions, boxing: state.boxing, templates: state.templates, today }),
+    [plan, state.sessions, state.boxing, state.templates, today],
+  );
+  const streak = foundationStreak(ctx, today);
+  const tw = targetWeeks(ctx, today);
+  const boxedTodayRec = state.boxing.find((b) => b.date === today) ?? null;
+  const boxStats = boxingWeekStats(state.boxing, weekStart(today));
+  const bw = useMemo(() => weightTrend(state.measurements, state.settings.maWindowDays), [state.measurements, state.settings.maWindowDays]);
+  const completedToday = state.sessions.filter((s) => s.date === today && s.status === 'completed');
+
+  const nextTpl = rec.strength.nextTemplateId ? store.templateById(rec.strength.nextTemplateId) : undefined;
+  const accTpl = rec.accessory ? store.templateById(rec.accessory.templateId) : undefined;
+  const liftNotes = rec.notes.filter((n) => n.id !== 'same-day');
+  const sameDay = rec.notes.find((n) => n.id === 'same-day');
+
+  function start(templateId: string) {
+    unlockAudio();
+    onOpenWorkout(store.startWorkout(templateId));
+  }
+
+  function logBoxing() {
+    unlockAudio();
+    const r = store.logBoxing(today);
+    setDetailsFor(r.id);
+  }
+
+  const detailsRec = detailsFor ? state.boxing.find((b) => b.id === detailsFor) : null;
+
+  const primaryIsStrength = rec.primary.kind === 'strength';
+  const primaryTpl = rec.primary.kind === 'strength' || rec.primary.kind === 'accessory' ? store.templateById(rec.primary.templateId) : undefined;
+
+  return (
+    <div className="screen">
+      <div className="topline">LIFTDECK // {plan.name}</div>
+      <h1 className="title">THIS WEEK</h1>
+      <div className="dim small">
+        {WEEKDAY_NAMES[weekdayIndex(today)]} · {formatShort(today)}
+      </div>
+
+      <div className="panel mt16" data-testid="week-panel">
+        {week.goals.map((g) => (
+          <GoalBar key={g.goal.id} g={g} />
+        ))}
+        <div className="status-line" data-testid="week-status">
+          <span className={week.foundation ? 'green' : 'dim'}>FOUNDATION {week.foundation ? '✓' : 'IN PROGRESS'}</span>
+          <span className={week.target ? 'cyan' : 'faint'}>TARGET {week.target ? '✓' : 'IN PROGRESS'}</span>
+        </div>
+      </div>
+
+      {/* ── recommended next ── */}
+      <div className="today-hero mt16" data-testid="recommended">
+        <div className="badge">RECOMMENDED NEXT</div>
+        {active ? (
+          <>
+            <div className="activity">{active.name}</div>
+            <div className="dim small">Session in progress.</div>
+            <button className="btn btn--green mt16" onClick={() => onOpenWorkout(active.id)}>
+              RESUME WORKOUT ▸
+            </button>
+          </>
+        ) : rec.primary.kind === 'boxing' ? (
+          <>
+            <div className="activity">BOXING</div>
+            <div className="dim small">{rec.primary.reason}</div>
+            {boxedTodayRec ? (
+              <div className="green small mt16">Boxing logged today ✓ · a second session still counts once</div>
+            ) : (
+              <button className="btn btn--primary mt16" onClick={logBoxing}>
+                BOXING DONE ✓
+              </button>
+            )}
+            {nextTpl && !rec.strength.gapOk ? null : nextTpl && rec.strength.count < rec.strength.target && (
+              <button className="btn btn--ghost mt8" style={{ width: '100%' }} onClick={() => start(nextTpl.id)}>
+                OR START {nextTpl.name} ▸
+              </button>
+            )}
+          </>
+        ) : rec.primary.kind === 'strength' || rec.primary.kind === 'accessory' ? (
+          <>
+            <div className={`activity ${templateTitle(primaryTpl).length > 14 ? 'activity--long' : ''}`}>
+              {rec.primary.kind === 'accessory' ? `BONUS // ${primaryTpl?.subtitle ?? primaryTpl?.name ?? ''}` : templateTitle(primaryTpl)}
+            </div>
+            <div className="dim small">{rec.primary.reason}</div>
+            <button className="btn btn--primary mt16" onClick={() => start(rec.primary.kind === 'strength' || rec.primary.kind === 'accessory' ? rec.primary.templateId : '')}>
+              START {primaryTpl?.name ?? 'WORKOUT'} ▸
+            </button>
+            {liftNotes.map((n) => (
+              <div key={n.id} className="note">{n.text}</div>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="activity">RECOVERY</div>
+            <div className="dim small">{rec.primary.reason}</div>
+            <div className="faint tiny mt8">Rest is not a failed activity. Boxing is always available below.</div>
+          </>
+        )}
+        {sameDay && !active && (rec.primary.kind === 'strength' || (rec.primary.kind !== 'boxing' && !!boxedTodayRec)) && (
+          <div className="note note--info">{sameDay.text}</div>
+        )}
+      </div>
+
+      {/* ── boxing always available ── */}
+      {rec.primary.kind !== 'boxing' && !active && (
+        <div className="mt16">
+          {boxedTodayRec ? (
+            <div className="panel spread">
+              <div>
+                <div className="green small" style={{ fontWeight: 700, letterSpacing: '0.1em' }}>BOXING LOGGED ✓</div>
+                <div className="tiny faint">
+                  {boxedTodayRec.sessionType ? boxedTodayRec.sessionType.toUpperCase() : 'no details'}
+                  {boxedTodayRec.durationMin ? ` · ${boxedTodayRec.durationMin} MIN` : ''}
+                  {boxedTodayRec.rpe ? ` · RPE ${boxedTodayRec.rpe}` : ''}
+                </div>
+              </div>
+              <div className="row" style={{ gap: 6 }}>
+                <button className="btn btn--ghost btn--small" onClick={() => setDetailsFor(boxedTodayRec.id)}>DETAILS</button>
+                <button className="btn btn--ghost btn--small" onClick={() => store.undoBoxing(today)}>UNDO</button>
+              </div>
+            </div>
+          ) : (
+            <button className="btn btn--green" onClick={logBoxing}>
+              BOXING DONE ✓
+            </button>
+          )}
+        </div>
+      )}
+      {rec.primary.kind === 'boxing' && boxedTodayRec && !active && (
+        <div className="spread mt8" style={{ padding: '0 4px' }}>
+          <span className="tiny faint" style={{ flex: 1 }}>
+            {boxedTodayRec.sessionType ? boxedTodayRec.sessionType.toUpperCase() : 'no details'}
+            {boxedTodayRec.durationMin ? ` · ${boxedTodayRec.durationMin} MIN` : ''}
+            {boxedTodayRec.rpe ? ` · RPE ${boxedTodayRec.rpe}` : ''}
+          </span>
+          <div className="row" style={{ gap: 6 }}>
+            <button className="btn btn--ghost btn--small" onClick={() => setDetailsFor(boxedTodayRec.id)}>DETAILS</button>
+            <button className="btn btn--ghost btn--small" onClick={() => store.undoBoxing(today)}>UNDO</button>
+          </div>
+        </div>
+      )}
+
+      {completedToday.length > 0 && (
+        <div className="panel mt16">
+          <div className="tiny faint">DONE TODAY</div>
+          {completedToday.map((s) => (
+            <div key={s.id} className="mt8">
+              <div className="small" style={{ fontWeight: 700 }}>{s.name} ✓</div>
+              {s.exercises
+                .filter((es) => es.sets.some((x) => x.reps != null))
+                .map((es) => (
+                  <div key={es.id} className="tiny dim">
+                    {es.name} · {fmtWeightShort(es)} × {es.sets.filter((x) => x.reps != null).map((x) => x.reps).join(', ')}
+                    {isIncrease(es.result) && <span className="green"> ▲</span>}
+                  </div>
+                ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!active && (
+        <button className="btn btn--ghost mt16" style={{ width: '100%' }} onClick={() => setPickTemplate(true)}>
+          START SOMETHING ELSE…
+        </button>
+      )}
+
+      {/* ── streaks (weekly, not daily) ── */}
+      <div className="stat-grid stat-grid--2">
+        <div className="stat">
+          <div className="num">{streak}</div>
+          <div className="lbl">FOUNDATION STREAK · WEEKS</div>
+        </div>
+        <div className="stat">
+          <div className="num">
+            {tw.hit}
+            <span className="faint" style={{ fontSize: 13 }}> of {tw.of || 8}</span>
+          </div>
+          <div className="lbl">TARGET WEEKS · LAST 8</div>
+        </div>
+      </div>
+
+      {/* ── secondary telemetry ── */}
+      <div className="mt16" style={{ padding: '0 4px' }}>
+        {(boxStats.minutes != null || boxStats.load != null) && (
+          <div className="spread dim small">
+            <span className="tiny faint">BOXING THIS WEEK</span>
+            <span>
+              {boxStats.minutes != null ? `${boxStats.minutes} MIN` : ''}
+              {boxStats.minutes != null && boxStats.load != null ? ' · ' : ''}
+              {boxStats.load != null ? `LOAD ${boxStats.load}` : ''}
+            </span>
+          </div>
+        )}
+        {bw && (
+          <div className="spread dim small mt8">
+            <span className="tiny faint">BODY {state.settings.maWindowDays}D AVG</span>
+            <span>
+              {bw.avg} lb{' '}
+              {bw.change7 != null && (
+                <span className={bw.change7 <= 0 ? 'green' : 'amber'}>
+                  {bw.change7 > 0 ? '+' : ''}
+                  {bw.change7} / 7d
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {pickTemplate && (
+        <Sheet onClose={() => setPickTemplate(false)}>
+          <div className="tiny faint">START SESSION</div>
+          {liftNotes.map((n) => (
+            <div key={n.id} className="note">{n.text}</div>
+          ))}
+          {state.templates.map((t) => {
+            const isNext = t.id === rec.strength.nextTemplateId;
+            const isAcc = !!accTpl && t.id === accTpl.id;
+            return (
+              <button
+                key={t.id}
+                className="list-row"
+                onClick={() => {
+                  setPickTemplate(false);
+                  start(t.id);
+                }}
+              >
+                <span style={{ flex: 1 }}>
+                  {templateTitle(t)}
+                  {isNext && <span className="cyan tiny"> · NEXT IN ROTATION</span>}
+                  {isAcc && <span className="purple tiny"> · OPTIONAL</span>}
+                </span>
+                <span className="faint tiny">{t.exercises.length} EX</span>
+              </button>
+            );
+          })}
+          {!boxedTodayRec && (
+            <button
+              className="list-row"
+              onClick={() => {
+                setPickTemplate(false);
+                logBoxing();
+              }}
+            >
+              <span style={{ flex: 1 }}>BOXING (log attendance)</span>
+            </button>
+          )}
+        </Sheet>
+      )}
+
+      {detailsRec && <BoxingDetailsSheet record={detailsRec} onClose={() => setDetailsFor(null)} />}
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LEGACY fixed weekday plan (unchanged behaviour)
+// ═══════════════════════════════════════════════════════════════════════════
+
+function FixedToday({ plan, onOpenWorkout }: { plan: FixedWorkoutPlan | null; onOpenWorkout: (sessionId: string) => void }) {
+  const state = useAppState();
+  const [pickTemplate, setPickTemplate] = useState(false);
+  const [detailsFor, setDetailsFor] = useState<string | null>(null);
   const today = todayISO();
   const activity = store.activityFor(today);
   const active = store.activeSession();
-  const plan = store.activePlan();
 
   const completedToday = state.sessions.filter((s) => s.date === today && s.status === 'completed');
-  const boxedToday = state.boxing.some((b) => b.date === today);
+  const boxedTodayRec = state.boxing.find((b) => b.date === today) ?? null;
+  const boxedToday = !!boxedTodayRec;
 
   const ctx = { plan, sessions: state.sessions, boxing: state.boxing, startDate: state.settings.startDate };
   const week = weekPlanStats(ctx, today);
@@ -36,14 +328,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
     }).filter((x): x is boolean => x !== null);
   }, [plan, state.boxing, state.sessions, today]);
 
-  const bwTrend = useMemo(() => {
-    const pts = state.measurements.map((m) => ({ date: m.date, value: m.weightLb }));
-    if (pts.length < 2) return null;
-    const ma = movingAverage(pts, state.settings.maWindowDays);
-    const latest = ma[ma.length - 1];
-    const prior = ma.length > 7 ? ma[ma.length - 8] : ma[0];
-    return { current: latest.value, delta: Math.round((latest.value - prior.value) * 10) / 10 };
-  }, [state.measurements, state.settings.maWindowDays]);
+  const bw = useMemo(() => weightTrend(state.measurements, state.settings.maWindowDays), [state.measurements, state.settings.maWindowDays]);
 
   const templateName =
     activity.type === 'workout' ? store.templateById(activity.templateId)?.name ?? 'WORKOUT' : null;
@@ -55,6 +340,14 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
     const id = store.startWorkout(activity.templateId);
     onOpenWorkout(id);
   }
+
+  function logBoxing() {
+    unlockAudio();
+    const r = store.logBoxing(today);
+    setDetailsFor(r.id);
+  }
+
+  const detailsRec = detailsFor ? state.boxing.find((b) => b.id === detailsFor) : null;
 
   return (
     <div className="screen">
@@ -78,21 +371,16 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
             </div>
             <div className="activity">BOXING</div>
             {!boxedToday ? (
-              <button
-                className="btn btn--primary mt16"
-                onClick={() => {
-                  unlockAudio();
-                  store.logBoxing(today);
-                }}
-              >
-                ATTENDED ✓
+              <button className="btn btn--primary mt16" onClick={logBoxing}>
+                BOXING DONE ✓
               </button>
             ) : (
               <div className="spread mt8">
                 <div className="green small">Session logged. Nice work.</div>
-                <button className="btn btn--ghost btn--small" onClick={() => store.undoBoxing(today)}>
-                  UNDO
-                </button>
+                <div className="row" style={{ gap: 6 }}>
+                  <button className="btn btn--ghost btn--small" onClick={() => setDetailsFor(boxedTodayRec!.id)}>DETAILS</button>
+                  <button className="btn btn--ghost btn--small" onClick={() => store.undoBoxing(today)}>UNDO</button>
+                </div>
               </div>
             )}
           </>
@@ -112,7 +400,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
                     <div key={es.id} className="small dim">
                       {es.name} · {fmtWeightShort(es)} ×{' '}
                       {es.sets.filter((s) => s.reps != null).map((s) => s.reps).join(', ')}
-                      {es.result === 'progress' && <span className="green"> ▲</span>}
+                      {isIncrease(es.result) && <span className="green"> ▲</span>}
                     </div>
                   ))}
               </div>
@@ -160,14 +448,14 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
         </div>
       </div>
 
-      {bwTrend && (
+      {bw && bw.change7 != null && (
         <div className="spread mt16 dim small" style={{ padding: '0 4px' }}>
           <span className="tiny faint">BODY TREND ({state.settings.maWindowDays}D AVG)</span>
           <span>
-            {bwTrend.current} lb{' '}
-            <span className={bwTrend.delta <= 0 ? 'green' : 'amber'}>
-              {bwTrend.delta > 0 ? '+' : ''}
-              {bwTrend.delta}
+            {bw.avg} lb{' '}
+            <span className={bw.change7 <= 0 ? 'green' : 'amber'}>
+              {bw.change7 > 0 ? '+' : ''}
+              {bw.change7}
             </span>
           </span>
         </div>
@@ -190,7 +478,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
                 onOpenWorkout(store.startWorkout(t.id));
               }}
             >
-              <span style={{ flex: 1 }}>{t.name}</span>
+              <span style={{ flex: 1 }}>{templateTitle(t)}</span>
               <span className="faint tiny">{t.exercises.length} EXERCISES</span>
             </button>
           ))}
@@ -198,8 +486,8 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
             <button
               className="list-row"
               onClick={() => {
-                store.logBoxing(today);
                 setPickTemplate(false);
+                logBoxing();
               }}
             >
               <span style={{ flex: 1 }}>BOXING (log attendance)</span>
@@ -207,6 +495,8 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
           )}
         </Sheet>
       )}
+
+      {detailsRec && <BoxingDetailsSheet record={detailsRec} onClose={() => setDetailsFor(null)} />}
     </div>
   );
 }

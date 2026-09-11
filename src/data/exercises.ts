@@ -85,6 +85,7 @@ const R: Row[] = [
   ['bb-rdl', 'Barbell Romanian Deadlift', 'Hamstrings', 'barbell', { compound: true }],
   ['db-single-leg-rdl', 'Single-Leg Dumbbell RDL', 'Hamstrings', 'dumbbell', { perSide: true, compound: true }],
   ['leg-curl', 'Leg Curl (machine)', 'Hamstrings', 'machine'],
+  ['cable-leg-curl', 'Cable Leg Curl', 'Hamstrings', 'cable', { perSide: true }],
   ['nordic-curl', 'Nordic Hamstring Curl', 'Hamstrings', 'bodyweight', { bodyweight: true }],
   ['cable-pull-through', 'Cable Pull-Through', 'Hamstrings', 'cable', { compound: true }],
   // ── Glutes ────────────────────────────────────────────

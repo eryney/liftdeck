@@ -60,3 +60,17 @@ export function formatDuration(ms: number): string {
   if (min < 60) return `${min} min`;
   return `${Math.floor(min / 60)}h ${min % 60}m`;
 }
+
+/** Sunday of the week containing iso */
+export function weekEnd(iso: string): string {
+  return addDays(weekStart(iso), 6);
+}
+
+export function hoursBetween(fromMs: number, toMs: number): number {
+  return (toMs - fromMs) / 3600000;
+}
+
+/** "AUG 31 – SEP 6" */
+export function formatWeekRange(weekStartISO: string): string {
+  return `${formatShort(weekStartISO)} – ${formatShort(addDays(weekStartISO, 6))}`;
+}

@@ -50,6 +50,8 @@ export function WeightEditor({
       <div className="center faint tiny mt8">
         STEP {trimNum(step)} {unit.toUpperCase()} · SUGGESTED {trimNum(suggested)}
       </div>
+      {perHand && <div className="center dim tiny mt8">PER HAND · the weight of EACH dumbbell</div>}
+      {bodyweight && <div className="center dim tiny mt8">ADDED load on top of bodyweight · 0 = bodyweight only</div>}
       <div className="mt16">
         <input
           type="number"

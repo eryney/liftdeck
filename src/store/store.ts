@@ -6,11 +6,17 @@ import type {
 import { bulkPut, clearAllStores, defaultSettings, del, loadAll, put } from '../lib/db';
 import type { DBShape } from '../lib/db';
 import { EXERCISE_LIBRARY } from '../data/exercises';
-import { SEED_PLAN, SEED_TEMPLATES } from '../data/seedPlan';
+import {
+  BOXER_CUT_GOAL_DATE, BOXER_CUT_PLAN, BOXER_CUT_PLAN_ID, BOXER_CUT_SEED_MARKER, BOXER_CUT_TEMPLATES, isUntouchedLegacySeed,
+} from '../data/seedPlan';
 import { newId } from '../lib/ids';
 import { todayISO, weekdayIndex } from '../lib/dates';
 import { computeResult, suggestWeight } from '../lib/progression';
+import { isFixedPlan, isFlexPlan } from '../lib/flex';
+import { migrateSettings } from '../lib/migrate';
+import type { ResolvedBundle } from '../lib/planBundle';
 import type { BackupFile } from '../types';
+import { SCHEMA_VERSION } from '../types';
 
 export interface RestTimer {
   key: string; // changes on each restart so effects re-fire
@@ -67,11 +73,10 @@ export class Store {
     let data = await loadAll();
     if (!data.settings) {
       await this.seed();
-      data = await loadAll();
-    } else if (data.exercises.length === 0) {
-      await bulkPut('exercises', EXERCISE_LIBRARY);
-      data = await loadAll();
+    } else {
+      await this.migrateExisting(data);
     }
+    data = await loadAll();
     this.hydrate(data);
   }
 
@@ -88,11 +93,54 @@ export class Store {
     });
   }
 
+  /** Fresh install: library + BOXER CUT // FLEX as the default plan. */
   private async seed(): Promise<void> {
     await bulkPut('exercises', EXERCISE_LIBRARY);
-    await bulkPut('templates', SEED_TEMPLATES);
-    await put('plans', SEED_PLAN);
-    await put('settings', defaultSettings());
+    await bulkPut('templates', BOXER_CUT_TEMPLATES);
+    await put('plans', BOXER_CUT_PLAN);
+    await put('settings', {
+      ...defaultSettings(),
+      goalMode: 'cut',
+      goalDate: BOXER_CUT_GOAL_DATE,
+      seedMarkers: [BOXER_CUT_SEED_MARKER],
+    } satisfies AppSettings);
+  }
+
+  /**
+   * Existing install. Nothing is deleted or rewritten:
+   * - settings gain v2 defaults (schemaVersion 2)
+   * - library exercises missing from the device (e.g. cable-leg-curl) are added; existing ones untouched
+   * - BOXER CUT // FLEX templates + plan are added exactly once (marker in settings)
+   * - it becomes active only if the active plan is still the untouched v1 default seed
+   */
+  private async migrateExisting(data: DBShape): Promise<void> {
+    const settings = migrateSettings(data.settings);
+    const markers = new Set(settings.seedMarkers ?? []);
+    const before = JSON.stringify(data.settings);
+
+    const haveEx = new Set(data.exercises.map((e) => e.id));
+    const missingEx = EXERCISE_LIBRARY.filter((e) => !haveEx.has(e.id));
+    if (missingEx.length > 0) await bulkPut('exercises', missingEx);
+
+    if (!markers.has(BOXER_CUT_SEED_MARKER)) {
+      const haveTpl = new Set(data.templates.map((t) => t.id));
+      const newTpls = BOXER_CUT_TEMPLATES.filter((t) => !haveTpl.has(t.id));
+      if (newTpls.length > 0) await bulkPut('templates', newTpls);
+      if (!data.plans.some((p) => p.id === BOXER_CUT_PLAN_ID)) await put('plans', BOXER_CUT_PLAN);
+      markers.add(BOXER_CUT_SEED_MARKER);
+      settings.seedMarkers = [...markers];
+
+      const active = data.plans.find((p) => p.id === settings.activePlanId) ?? null;
+      const shouldActivate = settings.activePlanId == null ? !settings.onboarded : isUntouchedLegacySeed(active);
+      if (shouldActivate) {
+        settings.activePlanId = BOXER_CUT_PLAN_ID;
+        if (settings.goalMode == null) {
+          settings.goalMode = 'cut';
+          settings.goalDate = settings.goalDate ?? BOXER_CUT_GOAL_DATE;
+        }
+      }
+    }
+    if (JSON.stringify(settings) !== before) await put('settings', settings);
   }
 
   // ── settings / onboarding ─────────────────────────────
@@ -113,9 +161,10 @@ export class Store {
     return this.state.plans.find((p) => p.id === this.state.settings.activePlanId) ?? null;
   }
 
+  /** Fixed plans only; flex plans have no weekday activities. */
   activityFor(date: string): DayActivity {
     const plan = this.activePlan();
-    return plan ? plan.schedule[weekdayIndex(date)] : { type: 'rest' };
+    return plan && isFixedPlan(plan) ? plan.schedule[weekdayIndex(date)] : { type: 'rest' };
   }
 
   activeSession(): WorkoutSession | null {
@@ -147,6 +196,7 @@ export class Store {
       repMax: tpl.repMax,
       restSec: tpl.restSec,
       increment: tpl.increment,
+      ...(tpl.targetRir != null ? { targetRir: tpl.targetRir } : {}),
       suggestedWeight: weight,
       weight,
       sets: Array.from({ length: tpl.sets }, () => ({ reps: null, weight })),
@@ -196,6 +246,7 @@ export class Store {
 
   /** Log reps for a set. Recomputes result if the session is already completed (history edit). */
   logSet(sessionId: string, esId: string, setIdx: number, reps: number | null): void {
+    const all = this.state.sessions;
     this.updateSession(sessionId, (s) => {
       const exercises = s.exercises.map((es) => {
         if (es.id !== esId) return es;
@@ -203,20 +254,30 @@ export class Store {
           i === setIdx ? { ...set, reps, weight: reps == null ? set.weight : es.weight, loggedAt: Date.now() } : set,
         );
         const next = { ...es, sets };
-        if (s.status === 'completed') next.result = computeResult(next);
+        if (s.status === 'completed') next.result = computeResult(next, all, s);
         return next;
       });
       return { ...s, exercises };
     });
   }
 
-  /** Change working weight; applies to unlogged sets (and optionally a specific logged set). */
+  /** Change working weight; applies to unlogged sets. What was already lifted is never rewritten. */
   setExerciseWeight(sessionId: string, esId: string, weight: number): void {
     this.updateExerciseSession(sessionId, esId, (es) => ({
       ...es,
       weight,
       sets: es.sets.map((set) => (set.reps == null ? { ...set, weight } : set)),
     }));
+  }
+
+  /** Optional one-tap RIR after the final prescribed set. Telemetry only. */
+  setFinalRir(sessionId: string, esId: string, rir: number | undefined): void {
+    this.updateExerciseSession(sessionId, esId, (es) => {
+      const next = { ...es };
+      if (rir == null) delete next.finalSetRir;
+      else next.finalSetRir = rir;
+      return next;
+    });
   }
 
   addSet(sessionId: string, esId: string): void {
@@ -232,6 +293,7 @@ export class Store {
     );
   }
 
+  /** Swap an exercise. Progression follows exercise identity: the substitute's own history drives its suggestion. */
   substituteExercise(sessionId: string, esId: string, newExerciseId: string, replaceInPlan: boolean): void {
     const ex = this.exerciseById(newExerciseId);
     if (!ex) return;
@@ -267,11 +329,12 @@ export class Store {
   }
 
   finishWorkout(sessionId: string): WorkoutSession | null {
+    const all = this.state.sessions;
     const finished = this.updateSession(sessionId, (s) => ({
       ...s,
       status: 'completed' as const,
       finishedAt: Date.now(),
-      exercises: s.exercises.map((es) => ({ ...es, result: computeResult(es) })),
+      exercises: s.exercises.map((es) => ({ ...es, result: computeResult(es, all, s) })),
     }));
     this.clearRest();
     return finished;
@@ -307,11 +370,29 @@ export class Store {
 
   // ── boxing ────────────────────────────────────────────
 
-  logBoxing(date = todayISO()): void {
-    if (this.state.boxing.some((b) => b.date === date)) return;
-    const rec: BoxingAttendance = { id: newId('bx'), date, loggedAt: Date.now() };
+  /** One tap. Returns the record (existing one if that date is already logged). Details are optional and can be added later. */
+  logBoxing(date = todayISO(), details: Partial<Pick<BoxingAttendance, 'durationMin' | 'rpe' | 'sessionType'>> = {}): BoxingAttendance {
+    const existing = this.state.boxing.find((b) => b.date === date);
+    if (existing) return existing;
+    const rec: BoxingAttendance = { id: newId('bx'), date, loggedAt: Date.now(), ...stripUndefined(details) };
     this.set({ boxing: [...this.state.boxing, rec] });
     put('boxing', rec).catch(persistErr);
+    return rec;
+  }
+
+  /** Add/change optional metadata on an existing boxing record. Passing undefined clears a field. */
+  updateBoxing(id: string, patch: Partial<Pick<BoxingAttendance, 'durationMin' | 'rpe' | 'sessionType'>>): void {
+    const cur = this.state.boxing.find((b) => b.id === id);
+    if (!cur) return;
+    const next: BoxingAttendance = { ...cur };
+    for (const k of ['durationMin', 'rpe', 'sessionType'] as const) {
+      if (!(k in patch)) continue;
+      const v = patch[k];
+      if (v == null) delete next[k];
+      else (next as any)[k] = v;
+    }
+    this.set({ boxing: this.state.boxing.map((b) => (b.id === id ? next : b)) });
+    put('boxing', next).catch(persistErr);
   }
 
   undoBoxing(date: string): void {
@@ -324,13 +405,13 @@ export class Store {
   // ── body measurements ─────────────────────────────────
 
   addMeasurement(date: string, weightLb: number, waistIn?: number): void {
-    // one measurement per date: replace existing
+    // one measurement per date: replace existing (keep an existing waist if the new entry omits it)
     const existing = this.state.measurements.find((m) => m.date === date);
     const rec: BodyMeasurement = {
       id: existing?.id ?? newId('bm'),
       date,
       weightLb,
-      waistIn,
+      ...(waistIn != null ? { waistIn } : existing?.waistIn != null ? { waistIn: existing.waistIn } : {}),
       loggedAt: Date.now(),
     };
     this.set({
@@ -358,9 +439,20 @@ export class Store {
 
   deleteTemplate(id: string): void {
     this.set({ templates: this.state.templates.filter((t) => t.id !== id) });
-    // remove from plan schedules
     for (const plan of this.state.plans) {
-      if (plan.schedule.some((d) => d.type === 'workout' && d.templateId === id)) {
+      if (isFlexPlan(plan)) {
+        const uses = plan.weeklyGoals.some(
+          (g) => (g.kind === 'rotation' && g.templateIds.includes(id)) || (g.kind === 'workout' && g.templateId === id),
+        );
+        if (!uses) continue;
+        this.savePlan({
+          ...plan,
+          weeklyGoals: plan.weeklyGoals
+            .map((g) => (g.kind === 'rotation' ? { ...g, templateIds: g.templateIds.filter((t) => t !== id) } : g))
+            .filter((g) => !(g.kind === 'workout' && g.templateId === id))
+            .filter((g) => !(g.kind === 'rotation' && g.templateIds.length === 0)),
+        });
+      } else if (plan.schedule.some((d) => d.type === 'workout' && d.templateId === id)) {
         this.savePlan({
           ...plan,
           schedule: plan.schedule.map((d) =>
@@ -386,6 +478,19 @@ export class Store {
     this.set({ plans: this.state.plans.filter((p) => p.id !== id) });
     del('plans', id).catch(persistErr);
     if (this.state.settings.activePlanId === id) this.updateSettings({ activePlanId: null });
+  }
+
+  /** Add a resolved plan bundle. Adds only; history, boxing, measurements and settings are untouched. */
+  async importPlanBundle(resolved: ResolvedBundle): Promise<string> {
+    if (resolved.exercises.length) await bulkPut('exercises', resolved.exercises);
+    if (resolved.templates.length) await bulkPut('templates', resolved.templates);
+    await put('plans', resolved.plan);
+    this.set({
+      exercises: [...this.state.exercises, ...resolved.exercises],
+      templates: [...this.state.templates, ...resolved.templates],
+      plans: [...this.state.plans, resolved.plan],
+    });
+    return resolved.plan.id;
   }
 
   // ── exercise library ──────────────────────────────────
@@ -422,6 +527,7 @@ export class Store {
     };
   }
 
+  /** FULL restore: replaces the entire database with the backup (already migrated by parseBackup). */
   async importBackup(backup: BackupFile): Promise<void> {
     await clearAllStores();
     await bulkPut('exercises', backup.exercises);
@@ -430,7 +536,9 @@ export class Store {
     await bulkPut('sessions', backup.sessions);
     await bulkPut('boxing', backup.boxing);
     await bulkPut('measurements', backup.measurements);
-    await put('settings', { ...backup.settings, id: 'settings' });
+    await put('settings', { ...backup.settings, id: 'settings', schemaVersion: SCHEMA_VERSION });
+    // a restored v1 backup gets the same one-time additions an upgraded install gets
+    await this.migrateExisting(await loadAll());
     this.hydrate(await loadAll());
   }
 
@@ -441,6 +549,12 @@ export class Store {
     this.set({ restTimer: null });
     this.hydrate(await loadAll());
   }
+}
+
+function stripUndefined<T extends object>(o: T): T {
+  const out = { ...o } as Record<string, unknown>;
+  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
+  return out as T;
 }
 
 export const store = new Store();

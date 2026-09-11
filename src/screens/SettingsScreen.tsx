@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { store, useAppState } from '../store/store';
-import { buildBackup, downloadFile, measurementsToCSV, parseBackup, sessionsToCSV } from '../lib/backup';
+import { boxingToCSV, buildBackup, downloadFile, measurementsToCSV, parseBackup, sessionsToCSV } from '../lib/backup';
 import { Confirm, Sheet } from '../components/Sheet';
 import { todayISO } from '../lib/dates';
 import { trimNum } from '../lib/format';
@@ -66,6 +66,49 @@ export function SettingsScreen() {
       {numRow('ISOLATION REST (SEC)', 'isolationRestSec', 15, 30)}
       {numRow('BODY AVG WINDOW (DAYS)', 'maWindowDays', 1, 3)}
 
+      <h2 className="section">BODY GOAL</h2>
+      <div className="panel">
+        <div className="spread">
+          <span className="small">CUT MODE</span>
+          <button className={`toggle ${s.goalMode === 'cut' ? 'on' : ''}`} onClick={() => store.updateSettings({ goalMode: s.goalMode === 'cut' ? null : 'cut' })} aria-label="toggle cut mode">
+            <i />
+          </button>
+        </div>
+        {s.goalMode === 'cut' && (
+          <>
+            <div className="spread mt8">
+              <span className="small dim">GOAL DATE</span>
+              <input type="date" style={{ width: 'auto' }} value={s.goalDate ?? ''} onChange={(e) => store.updateSettings({ goalDate: e.target.value || undefined })} aria-label="goal date" />
+            </div>
+            <div className="spread mt8">
+              <span className="small dim">GOAL WEIGHT (LB, optional)</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                style={{ width: 110 }}
+                placeholder="—"
+                value={s.goalWeightLb ?? ''}
+                onChange={(e) => store.updateSettings({ goalWeightLb: e.target.value ? Number(e.target.value) : undefined })}
+                aria-label="goal weight"
+              />
+            </div>
+            <div className="spread mt8">
+              <span className="small dim">GOAL WAIST (IN, optional)</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                style={{ width: 110 }}
+                placeholder="—"
+                value={s.goalWaistIn ?? ''}
+                onChange={(e) => store.updateSettings({ goalWaistIn: e.target.value ? Number(e.target.value) : undefined })}
+                aria-label="goal waist"
+              />
+            </div>
+            <div className="tiny faint mt8">The app never invents a goal weight or waist: visible abs don't map to one universal number. Diet lives elsewhere.</div>
+          </>
+        )}
+      </div>
+
       <h2 className="section">FEEDBACK</h2>
       <div className="spread panel mt8" style={{ padding: '10px 14px' }}>
         <span className="small">TIMER SOUND</span>
@@ -114,7 +157,18 @@ export function SettingsScreen() {
           >
             BODY CSV
           </button>
+          <button
+            className="btn btn--ghost"
+            style={{ flex: 1 }}
+            onClick={() => {
+              downloadFile(`liftdeck-boxing-${todayISO()}.csv`, boxingToCSV(store.state.boxing), 'text/csv');
+              setNote('Boxing CSV exported.');
+            }}
+          >
+            BOXING CSV
+          </button>
         </div>
+        <div className="tiny faint mt8">Plan files (export/import a program without touching history) live under PLAN.</div>
       </div>
 
       <h2 className="section">DANGER ZONE</h2>
@@ -123,7 +177,7 @@ export function SettingsScreen() {
       </button>
 
       <div className="center faint tiny mt16">
-        LIFTDECK v1.0 · {state.sessions.filter((x) => x.status === 'completed').length} workouts ·{' '}
+        LIFTDECK v2.0 · schema {s.schemaVersion} · {state.sessions.filter((x) => x.status === 'completed').length} workouts ·{' '}
         {state.boxing.length} boxing sessions on record
       </div>
 
