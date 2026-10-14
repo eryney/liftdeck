@@ -4,11 +4,20 @@ import type { Category, Exercise } from '../types';
 import { store, useAppState } from '../store/store';
 import { newId } from '../lib/ids';
 import { SUGGESTED_SUBSTITUTES } from '../data/substitutions';
+import { progressionById } from '../data/progressions';
 
 const CATEGORIES: Category[] = [
   'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 'Quads',
   'Hamstrings', 'Glutes', 'Calves', 'Core', 'Full Body', 'Cardio', 'Other',
 ];
+
+function subtitle(e: Exercise): string {
+  const parts = [e.category.toUpperCase(), e.equipment.toUpperCase()];
+  if (e.progressionId) parts.push(`${progressionById(e.progressionId)?.name ?? 'CHAIN'} · R${(e.level ?? 0) + 1}`);
+  if (e.timed) parts.push('SECONDS');
+  if (e.custom) parts.push('CUSTOM');
+  return parts.join(' · ');
+}
 
 /** Searchable exercise picker with inline custom-exercise creation. */
 export function ExercisePicker({
@@ -28,7 +37,7 @@ export function ExercisePicker({
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState<Category>('Other');
-  const [newEquip, setNewEquip] = useState<Exercise['equipment']>('dumbbell');
+  const [newEquip, setNewEquip] = useState<Exercise['equipment']>('bodyweight');
   const [newBW, setNewBW] = useState(false);
 
   const suggested = useMemo(() => {
@@ -46,7 +55,8 @@ export function ExercisePicker({
       (e) =>
         e.name.toLowerCase().includes(needle) ||
         e.category.toLowerCase().includes(needle) ||
-        e.equipment.includes(needle),
+        e.equipment.includes(needle) ||
+        (e.progressionId ? (progressionById(e.progressionId)?.name ?? '').toLowerCase().includes(needle) : false),
     );
   }, [q, state.exercises]);
 
@@ -56,7 +66,7 @@ export function ExercisePicker({
       name: newName.trim(),
       category: newCat,
       equipment: newEquip,
-      bodyweight: newBW || newEquip === 'bodyweight' || undefined,
+      bodyweight: newBW || newEquip === 'bodyweight' || newEquip === 'band' || undefined,
       perHand: newEquip === 'dumbbell' || undefined,
       custom: true,
     };
@@ -86,7 +96,7 @@ export function ExercisePicker({
                   <button key={`s-${e.id}`} className="list-row" onClick={() => onPick(e)}>
                     <div style={{ flex: 1 }}>
                       <div className="cyan">{e.name}</div>
-                      <div className="tiny faint">{e.category.toUpperCase()} · {e.equipment.toUpperCase()}</div>
+                      <div className="tiny faint">{subtitle(e)}</div>
                     </div>
                   </button>
                 ))}
@@ -97,10 +107,7 @@ export function ExercisePicker({
               <button key={e.id} className="list-row" onClick={() => onPick(e)}>
                 <div style={{ flex: 1 }}>
                   <div>{e.name}</div>
-                  <div className="tiny faint">
-                    {e.category.toUpperCase()} · {e.equipment.toUpperCase()}
-                    {e.custom ? ' · CUSTOM' : ''}
-                  </div>
+                  <div className="tiny faint">{subtitle(e)}</div>
                 </div>
               </button>
             ))}
@@ -132,7 +139,7 @@ export function ExercisePicker({
               ))}
             </select>
             <select value={newEquip} onChange={(e) => setNewEquip(e.target.value as Exercise['equipment'])}>
-              {(['dumbbell', 'barbell', 'cable', 'bodyweight', 'machine', 'other'] as const).map((eq) => (
+              {(['bodyweight', 'band', 'dumbbell', 'barbell', 'cable', 'machine', 'other'] as const).map((eq) => (
                 <option key={eq} value={eq}>{eq}</option>
               ))}
             </select>

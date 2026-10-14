@@ -10,6 +10,7 @@ import { boxingGoal, nextRotationTemplateId, optionalTemplateIds, rotationGoal, 
  *   3. strength below target (and rested)            → next A/B
  *   4. boxing below target                           → boxing
  *   5. otherwise                                     → recovery, or the optional session if it's a good day for it
+ * The optional session is also offered as a secondary choice whenever strength is not the call (not rested, or done).
  * Boxing is always available regardless of what is recommended. Nothing is ever blocked.
  */
 
@@ -102,9 +103,12 @@ export function recommend(input: RecommendInput): Recommendation {
 
   const accCount = optGoal ? week.goals.find((g) => g.goal.id === optGoal.id)?.count ?? 0 : 0;
   const accMax = optGoal?.max ?? null;
+  // The optional session is low-fatigue practice: offered whenever strength is not the call today
+  // (target reached, soft max reached, or not yet rested), boxing is at its minimum, and its own cap is not hit.
+  const strengthWanted = !!rg && !!nextTemplateId && strengthCount < strengthTarget && !strengthAtMax;
   const accessoryVisible =
     !!optGoal &&
-    strengthCount >= Math.max(2, strengthTarget) &&
+    (!strengthWanted || !gapOk) &&
     boxingCount >= boxingMin &&
     !hardBoxingRecent &&
     (accMax == null || accCount < accMax);
@@ -120,8 +124,8 @@ export function recommend(input: RecommendInput): Recommendation {
     primary = { kind: 'strength', templateId: nextTemplateId, reason: `STRENGTH TARGET · ${strengthCount} of ${strengthTarget}` };
   } else if (canBox && boxingCount < boxingTarget) {
     primary = { kind: 'boxing', reason: `BOXING TARGET · ${boxingCount} of ${boxingTarget}` };
-  } else if (accessoryVisible && optGoal) {
-    primary = { kind: 'accessory', templateId: optGoal.templateId, reason: 'CORE TARGETS MET · bonus volume if you feel good' };
+  } else if (accessoryVisible && optGoal && (week.target || strengthAtMax)) {
+    primary = { kind: 'accessory', templateId: optGoal.templateId, reason: 'CORE TARGETS MET · optional session if you feel good' };
   } else if (boxedToday && !week.target) {
     const next = rg && nextTemplateId && strengthCount < strengthTarget && !strengthAtMax ? (gapOk ? 'next strength when you have time' : 'next strength once rested') : 'more boxing counts from tomorrow';
     primary = { kind: 'recovery', reason: `BOXING LOGGED TODAY · ${next}` };

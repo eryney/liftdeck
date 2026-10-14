@@ -8,10 +8,13 @@ import { Sheet } from '../components/Sheet';
 import { GoalBar } from '../components/GoalBar';
 import { BoxingDetailsSheet } from '../components/BoxingDetails';
 import { weightTrend } from '../lib/body';
-import { foundationStreak, isFlexPlan, targetWeeks, weekAttainment } from '../lib/flex';
+import { boxingGoal, foundationStreak, isFlexPlan, targetWeeks, weekAttainment } from '../lib/flex';
 import { recommend } from '../lib/recommend';
 import { boxingWeekStats } from '../lib/boxing';
 import { isIncrease } from '../lib/progression';
+import { fmtRepList } from '../lib/format';
+import { fmtTargets } from '../lib/prescribe';
+import { fmtRest, slotLabels } from '../lib/pairs';
 import type { FixedWorkoutPlan, FlexWorkoutPlan, WorkoutTemplate } from '../types';
 
 export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: string) => void }) {
@@ -51,8 +54,9 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
 
   const nextTpl = rec.strength.nextTemplateId ? store.templateById(rec.strength.nextTemplateId) : undefined;
   const accTpl = rec.accessory ? store.templateById(rec.accessory.templateId) : undefined;
-  const liftNotes = rec.notes.filter((n) => n.id !== 'same-day');
-  const sameDay = rec.notes.find((n) => n.id === 'same-day');
+  const hasBoxing = !!boxingGoal(plan);
+  const liftNotes = rec.notes.filter((n) => n.id !== 'same-day' && (hasBoxing || n.id !== 'hard-boxing'));
+  const sameDay = hasBoxing ? rec.notes.find((n) => n.id === 'same-day') : undefined;
 
   function start(templateId: string) {
     unlockAudio();
@@ -69,6 +73,10 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
 
   const primaryIsStrength = rec.primary.kind === 'strength';
   const primaryTpl = rec.primary.kind === 'strength' || rec.primary.kind === 'accessory' ? store.templateById(rec.primary.templateId) : undefined;
+  const preview = useMemo(
+    () => (!active && primaryTpl ? store.previewWorkout(primaryTpl.id) : []),
+    [active?.id, primaryTpl?.id, state.sessions, state.exercises, state.templates],
+  );
 
   return (
     <div className="screen">
@@ -128,12 +136,40 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
             {liftNotes.map((n) => (
               <div key={n.id} className="note">{n.text}</div>
             ))}
+            {preview.length > 0 && (() => {
+              const labels = slotLabels(preview);
+              const pairs = preview.filter((e) => e.pairGroup).length;
+              return (
+                <div className="preview mt16" data-testid="preview">
+                  <div className="tiny faint">TODAY'S CARD · {preview.length} EXERCISES{pairs > 0 ? ' · SUPERSETS: ALTERNATE A1 ⇄ A2, REST BETWEEN' : ''}</div>
+                  {preview.map((e, i) => {
+                    const l = labels[i];
+                    const startsGroup = l.group && l.pos === 0;
+                    return (
+                      <div key={e.id} className={`preview__row ${l.group ? 'preview__row--pair' : ''} ${startsGroup ? 'preview__row--first' : ''}`}>
+                        <span className={`slot-tag ${l.group ? 'slot-tag--pair' : ''}`}>{l.tag}</span>
+                        <span className="preview__name">
+                          {e.name}
+                          {e.variationBasis === 'advance' && <span className="green tiny"> ▲ NEW RUNG</span>}
+                          {e.variationBasis === 'regress' && <span className="amber tiny"> ↓ STEP BACK</span>}
+                          {e.variationBasis === 'top' && <span className="green tiny"> ▲ +LOAD</span>}
+                          <div className="tiny faint">
+                            {e.timed ? 'hold' : 'reps'}{e.perSide ? ' · each side' : ''} · rest {fmtRest(e.restSec)}
+                          </div>
+                        </span>
+                        <span className="preview__nums">{fmtTargets(e.targetReps, e.timed)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </>
         ) : (
           <>
             <div className="activity">RECOVERY</div>
             <div className="dim small">{rec.primary.reason}</div>
-            <div className="faint tiny mt8">Rest is not a failed activity. Boxing is always available below.</div>
+            <div className="faint tiny mt8">Rest is not a failed activity.{hasBoxing ? ' Boxing is always available below.' : accTpl ? ' The optional session is always available below.' : ''}</div>
           </>
         )}
         {sameDay && !active && (rec.primary.kind === 'strength' || (rec.primary.kind !== 'boxing' && !!boxedTodayRec)) && (
@@ -141,8 +177,8 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
         )}
       </div>
 
-      {/* ── boxing always available ── */}
-      {rec.primary.kind !== 'boxing' && !active && (
+      {/* ── boxing always available (plans with a boxing goal) ── */}
+      {hasBoxing && rec.primary.kind !== 'boxing' && !active && (
         <div className="mt16">
           {boxedTodayRec ? (
             <div className="panel spread">
@@ -180,6 +216,12 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
         </div>
       )}
 
+      {accTpl && rec.accessory && rec.primary.kind !== 'accessory' && !active && rec.accessory.visible && (
+        <button className="btn btn--ghost mt8" style={{ width: '100%' }} onClick={() => start(accTpl.id)}>
+          OR {accTpl.name} // {accTpl.subtitle ?? 'OPTIONAL'} ▸ <span className="faint tiny">{rec.accessory.count}/{rec.accessory.max ?? '∞'} this week</span>
+        </button>
+      )}
+
       {completedToday.length > 0 && (
         <div className="panel mt16">
           <div className="tiny faint">DONE TODAY</div>
@@ -190,7 +232,7 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
                 .filter((es) => es.sets.some((x) => x.reps != null))
                 .map((es) => (
                   <div key={es.id} className="tiny dim">
-                    {es.name} · {fmtWeightShort(es)} × {es.sets.filter((x) => x.reps != null).map((x) => x.reps).join(', ')}
+                    {es.name} · {fmtWeightShort(es)} × {fmtRepList(es.sets.map((x) => x.reps), es.timed)}
                     {isIncrease(es.result) && <span className="green"> ▲</span>}
                   </div>
                 ))}
@@ -222,7 +264,7 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
 
       {/* ── secondary telemetry ── */}
       <div className="mt16" style={{ padding: '0 4px' }}>
-        {(boxStats.minutes != null || boxStats.load != null) && (
+        {hasBoxing && (boxStats.minutes != null || boxStats.load != null) && (
           <div className="spread dim small">
             <span className="tiny faint">BOXING THIS WEEK</span>
             <span>
@@ -275,7 +317,7 @@ function FlexToday({ plan, onOpenWorkout }: { plan: FlexWorkoutPlan; onOpenWorko
               </button>
             );
           })}
-          {!boxedTodayRec && (
+          {hasBoxing && !boxedTodayRec && (
             <button
               className="list-row"
               onClick={() => {

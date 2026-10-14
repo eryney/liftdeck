@@ -1,7 +1,7 @@
 {
   "app": "liftdeck-plan",
-  "schemaVersion": 2,
-  "exportedAt": "2026-09-10T17:15:21.470Z",
+  "schemaVersion": 3,
+  "exportedAt": "2026-10-14T19:45:45.399Z",
   "plan": {
     "id": "plan_boxer_cut_flex",
     "name": "BOXER CUT",

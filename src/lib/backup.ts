@@ -46,7 +46,7 @@ function csvEscape(v: unknown): string {
 }
 
 export function sessionsToCSV(sessions: BackupFile['sessions']): string {
-  const rows: string[] = ['date,workout,exercise,set,weight_lb,reps,result,prescribed,final_set_rir'];
+  const rows: string[] = ['date,workout,exercise,set,weight_lb,reps,target,result,prescribed,final_set_rir'];
   const sorted = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
   for (const s of sorted) {
     if (s.status !== 'completed') continue;
@@ -55,7 +55,7 @@ export function sessionsToCSV(sessions: BackupFile['sessions']): string {
         if (set.reps == null) return;
         rows.push(
           [
-            s.date, s.name, es.name, i + 1, set.weight, set.reps, es.result ?? '',
+            s.date, s.name, es.name, i + 1, set.weight, set.reps, es.targetReps?.[i] ?? '', es.result ?? '',
             i < es.targetSets ? 'yes' : 'extra',
             i === es.targetSets - 1 && es.finalSetRir != null ? es.finalSetRir : '',
           ].map(csvEscape).join(','),

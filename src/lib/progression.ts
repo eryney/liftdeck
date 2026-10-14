@@ -110,14 +110,17 @@ function round1(n: number): number {
   return Math.round(n * 10) / 10;
 }
 
-/** Display label for any stored result, including v1 values. */
-export function resultLabel(r: ExerciseResult | undefined): { text: string; glyph: string; cls: string } {
+/**
+ * Display label for any stored result, including v1 values.
+ * Pass `chain` for exercises that progress by variation: INCREASE reads ADVANCE and REDUCE reads STEP BACK.
+ */
+export function resultLabel(r: ExerciseResult | undefined, chain = false): { text: string; glyph: string; cls: string } {
   switch (r) {
     case 'increase':
     case 'progress':
-      return { text: 'INCREASE', glyph: '▲', cls: 'green' };
+      return { text: chain ? 'ADVANCE' : 'INCREASE', glyph: '▲', cls: 'green' };
     case 'reduce':
-      return { text: 'REDUCE', glyph: '↓', cls: 'amber' };
+      return { text: chain ? 'STEP BACK' : 'REDUCE', glyph: '↓', cls: 'amber' };
     case 'incomplete':
       return { text: 'INCOMPLETE', glyph: '·', cls: 'faint' };
     case 'hold':

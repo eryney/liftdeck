@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { store, useAppState } from '../store/store';
-import { BOXER_CUT_PLAN_ID } from '../data/seedPlan';
+import { CALI_PLAN_ID } from '../data/seedPlan';
 import { isFlexPlan } from '../lib/flex';
 
 export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) {
   const state = useAppState();
   const [preview, setPreview] = useState(false);
-  const plan = state.plans.find((p) => p.id === BOXER_CUT_PLAN_ID) ?? state.plans[0];
+  const plan = state.plans.find((p) => p.id === CALI_PLAN_ID) ?? state.plans[0];
 
   if (preview && plan && isFlexPlan(plan)) {
     return (
@@ -25,7 +25,11 @@ export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) 
                 ) : (
                   <>
                     minimum {g.minimum} · target {g.target}
-                    {g.kind === 'rotation' && <div className="tiny faint">A ↔ B full body · rotation never resets</div>}
+                    {g.kind === 'rotation' && (
+                      <div className="tiny faint">
+                        {g.templateIds.map((id) => store.templateById(id)?.name ?? '?').join(' → ')} · rotation never resets
+                      </div>
+                    )}
                   </>
                 )}
               </span>
@@ -33,8 +37,9 @@ export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) 
           ))}
         </div>
         <div className="dim small mt16">
-          Boxing is the sport. Two short full-body lifts keep strength and muscle while cutting; one is the floor on a bad week.
-          Weeks are judged on totals, never on which day something happened. Rest days are just rest.
+          A pull-up bar, the floor, a table and a couple of chairs. Four ~45-minute sessions a week in a fixed rotation, every
+          muscle twice a week. Overload comes from progression chains: hit the rep ceiling on every set and the next session
+          serves the harder variation. Weeks are judged on totals, never on which day something happened.
         </div>
         <button
           className="btn btn--primary mt16"
@@ -59,10 +64,10 @@ export function Onboarding({ onDone }: { onDone: (goToPlan: boolean) => void }) 
         <h1 className="title" style={{ fontSize: 34 }}>
           LIFT<span className="cyan">DECK</span>
         </h1>
-        <div className="dim small">Boxing first. Lifting fits around it. Choose a plan:</div>
+        <div className="dim small">Bodyweight only. Progressive overload by variation. Choose a plan:</div>
       </div>
       <button className="btn btn--primary mt16" onClick={() => setPreview(true)}>
-        {plan ? `${plan.name} // FLEX` : 'BOXER CUT // FLEX'}
+        {plan ? `${plan.name} // FLEX` : 'CALISTHENICS CUT // FLEX'}
       </button>
       <button
         className="btn btn--ghost mt8"

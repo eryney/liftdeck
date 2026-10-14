@@ -1,0 +1,626 @@
+{
+  "app": "liftdeck-plan",
+  "schemaVersion": 3,
+  "exportedAt": "2026-10-14T20:11:36.756Z",
+  "plan": {
+    "id": "plan_calisthenics_cut_flex",
+    "name": "CALISTHENICS CUT",
+    "mode": "flex",
+    "weeklyGoals": [
+      {
+        "id": "goal_strength",
+        "kind": "rotation",
+        "templateIds": [
+          "tpl_cc_upper_a",
+          "tpl_cc_lower_a",
+          "tpl_cc_upper_b",
+          "tpl_cc_lower_b"
+        ],
+        "minimum": 3,
+        "target": 4,
+        "max": 5,
+        "minGapHours": 20
+      },
+      {
+        "id": "goal_flow",
+        "kind": "workout",
+        "templateId": "tpl_cc_flow",
+        "minimum": 0,
+        "target": 1,
+        "max": 2,
+        "optional": true
+      }
+    ]
+  },
+  "templates": [
+    {
+      "id": "tpl_cc_upper_a",
+      "name": "UPPER A",
+      "subtitle": "PULL-UP + PUSH-UP",
+      "warmup": [
+        "Wrist circles + shoulder circles · 60 s",
+        "Bear crawl · 2 × 20 s forward/back",
+        "Dead hang 20 s → scapular pull-ups × 8",
+        "Incline or easy push-ups × 10, slow",
+        "One easy set of the first pair at half effort"
+      ],
+      "exercises": [
+        {
+          "id": "cua_0_pull-up",
+          "exerciseId": "pull-up",
+          "sets": 3,
+          "repMin": 5,
+          "repMax": 8,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "cua_1_push-up",
+          "exerciseId": "push-up",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2
+        },
+        {
+          "id": "cua_2_pike-push-up",
+          "exerciseId": "pike-push-up",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "cua_3_table-row",
+          "exerciseId": "table-row",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1
+        },
+        {
+          "id": "cua_4_hanging-knee-raise",
+          "exerciseId": "hanging-knee-raise",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "cua_5_prone-y-raise",
+          "exerciseId": "prone-y-raise",
+          "sets": 2,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 0
+        }
+      ]
+    },
+    {
+      "id": "tpl_cc_lower_a",
+      "name": "LOWER A",
+      "subtitle": "SQUAT + NORDIC",
+      "warmup": [
+        "Hip circles + ankle rocks · 60 s",
+        "Deep squat hold · 30 s, shift side to side",
+        "Frogger · 2 × 20 s",
+        "Reverse lunges × 6 / side, glute bridges × 12",
+        "Broad jumps × 5, land soft"
+      ],
+      "exercises": [
+        {
+          "id": "cla_0_bulgarian-split-squat-bw",
+          "exerciseId": "bulgarian-split-squat-bw",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "cla_1_sliding-leg-curl",
+          "exerciseId": "sliding-leg-curl",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2
+        },
+        {
+          "id": "cla_2_cossack-squat",
+          "exerciseId": "cossack-squat",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "cla_3_single-leg-calf-raise",
+          "exerciseId": "single-leg-calf-raise",
+          "sets": 3,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 45,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 0
+        },
+        {
+          "id": "cla_4_hollow-body-hold",
+          "exerciseId": "hollow-body-hold",
+          "sets": 3,
+          "repMin": 15,
+          "repMax": 30,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "cla_5_side-plank",
+          "exerciseId": "side-plank",
+          "sets": 2,
+          "repMin": 20,
+          "repMax": 40,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1
+        }
+      ]
+    },
+    {
+      "id": "tpl_cc_upper_b",
+      "name": "UPPER B",
+      "subtitle": "CHIN-UP + DIP",
+      "warmup": [
+        "Wrist circles + shoulder circles · 60 s",
+        "Bear crawl · 2 × 20 s forward/back",
+        "Dead hang 20 s → scapular pull-ups × 8",
+        "Incline or easy push-ups × 10, slow",
+        "One easy set of the first pair at half effort"
+      ],
+      "exercises": [
+        {
+          "id": "cub_0_chin-up",
+          "exerciseId": "chin-up",
+          "sets": 3,
+          "repMin": 5,
+          "repMax": 8,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "cub_1_chair-dip",
+          "exerciseId": "chair-dip",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2
+        },
+        {
+          "id": "cub_2_table-row",
+          "exerciseId": "table-row",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "cub_3_push-up",
+          "exerciseId": "push-up",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1
+        },
+        {
+          "id": "cub_4_reverse-crunch",
+          "exerciseId": "reverse-crunch",
+          "sets": 3,
+          "repMin": 5,
+          "repMax": 8,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "cub_5_wall-handstand-hold",
+          "exerciseId": "wall-handstand-hold",
+          "sets": 2,
+          "repMin": 20,
+          "repMax": 45,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1
+        }
+      ]
+    },
+    {
+      "id": "tpl_cc_lower_b",
+      "name": "LOWER B",
+      "subtitle": "LUNGE + HIP THRUST",
+      "warmup": [
+        "Hip circles + ankle rocks · 60 s",
+        "Deep squat hold · 30 s, shift side to side",
+        "Frogger · 2 × 20 s",
+        "Reverse lunges × 6 / side, glute bridges × 12",
+        "Broad jumps × 5, land soft"
+      ],
+      "exercises": [
+        {
+          "id": "clb_0_reverse-lunge",
+          "exerciseId": "reverse-lunge",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "clb_1_single-leg-hip-thrust",
+          "exerciseId": "single-leg-hip-thrust",
+          "sets": 3,
+          "repMin": 10,
+          "repMax": 15,
+          "restSec": 75,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 1
+        },
+        {
+          "id": "clb_2_sliding-leg-curl",
+          "exerciseId": "sliding-leg-curl",
+          "sets": 3,
+          "repMin": 6,
+          "repMax": 10,
+          "restSec": 60,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 2,
+          "superset": true
+        },
+        {
+          "id": "clb_3_single-leg-calf-raise",
+          "exerciseId": "single-leg-calf-raise",
+          "sets": 3,
+          "repMin": 12,
+          "repMax": 20,
+          "restSec": 45,
+          "increment": 5,
+          "startWeight": 0,
+          "targetRir": 0
+        },
+        {
+          "id": "clb_4_hanging-knee-raise",
+          "exerciseId": "hanging-knee-raise",
+          "sets": 3,
+          "repMin": 8,
+          "repMax": 12,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1,
+          "superset": true
+        },
+        {
+          "id": "clb_5_arch-raise",
+          "exerciseId": "arch-raise",
+          "sets": 2,
+          "repMin": 12,
+          "repMax": 15,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 1
+        }
+      ]
+    },
+    {
+      "id": "tpl_cc_flow",
+      "name": "FLOW",
+      "subtitle": "LOCOMOTION + HANGS",
+      "warmup": [
+        "Joint circles head to toe · 2 min",
+        "Easy cat-cow × 10, down-dog pedals × 10"
+      ],
+      "exercises": [
+        {
+          "id": "ccf_0_bear-crawl",
+          "exerciseId": "bear-crawl",
+          "sets": 3,
+          "repMin": 30,
+          "repMax": 45,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 3
+        },
+        {
+          "id": "ccf_1_monkey",
+          "exerciseId": "monkey",
+          "sets": 3,
+          "repMin": 30,
+          "repMax": 45,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 3
+        },
+        {
+          "id": "ccf_2_frogger",
+          "exerciseId": "frogger",
+          "sets": 3,
+          "repMin": 30,
+          "repMax": 45,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 3
+        },
+        {
+          "id": "ccf_3_deep-squat-hold",
+          "exerciseId": "deep-squat-hold",
+          "sets": 3,
+          "repMin": 30,
+          "repMax": 60,
+          "restSec": 30,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 3
+        },
+        {
+          "id": "ccf_4_dead-hang",
+          "exerciseId": "dead-hang",
+          "sets": 3,
+          "repMin": 20,
+          "repMax": 40,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 3
+        },
+        {
+          "id": "ccf_5_wall-handstand-hold",
+          "exerciseId": "wall-handstand-hold",
+          "sets": 3,
+          "repMin": 15,
+          "repMax": 30,
+          "restSec": 45,
+          "increment": 2.5,
+          "startWeight": 0,
+          "targetRir": 2
+        }
+      ]
+    }
+  ],
+  "exercises": [
+    {
+      "id": "pike-push-up",
+      "name": "Pike Push-Up",
+      "category": "Shoulders",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "cue": "Hips high, feet close. Head travels forward to a spot between your hands. Full lockout.",
+      "progressionId": "vpush",
+      "level": 0
+    },
+    {
+      "id": "table-row",
+      "name": "Table Row (horizontal)",
+      "category": "Back",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "cue": "Body straight and horizontal under the table edge. Squeeze the shoulder blades at the top.",
+      "gear": "sturdy table",
+      "progressionId": "row",
+      "level": 1
+    },
+    {
+      "id": "prone-y-raise",
+      "name": "Prone Y Raise",
+      "category": "Shoulders",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "cue": "Lie face down, arms in a Y, thumbs up. Lift as high as possible, 1-s squeeze. Light but brutal."
+    },
+    {
+      "id": "bulgarian-split-squat-bw",
+      "name": "Bulgarian Split Squat",
+      "category": "Quads",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "perSide": true,
+      "cue": "Rear foot on a chair. Sink straight down, front knee tracks over the toes. Slow 3-s descent.",
+      "gear": "chair",
+      "progressionId": "squat",
+      "level": 2
+    },
+    {
+      "id": "sliding-leg-curl",
+      "name": "Sliding Leg Curl",
+      "category": "Hamstrings",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "cue": "Lie on your back, heels on a towel, bridge up, slide heels out and pull them back without dropping the hips.",
+      "gear": "towel on a smooth floor",
+      "progressionId": "hinge",
+      "level": 0
+    },
+    {
+      "id": "cossack-squat",
+      "name": "Cossack Squat",
+      "category": "Quads",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "perSide": true,
+      "cue": "Wide stance, sit all the way to one side with the other leg straight and toes up. Alternate."
+    },
+    {
+      "id": "hollow-body-hold",
+      "name": "Hollow Body Hold",
+      "category": "Core",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Lower back glued to the floor, arms overhead, legs straight and low. Breathe. Seconds held.",
+      "progressionId": "lsit",
+      "level": 0
+    },
+    {
+      "id": "chair-dip",
+      "name": "Chair / Corner Dip",
+      "category": "Chest",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "cue": "Hands on two chair backs or a counter corner. Lean slightly forward, lower until shoulders are at elbow height.",
+      "gear": "two sturdy chairs or a counter corner",
+      "progressionId": "dip",
+      "level": 2
+    },
+    {
+      "id": "reverse-crunch",
+      "name": "Reverse Crunch",
+      "category": "Core",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "cue": "Lie flat, hands anchored overhead on something solid, curl knees to chest and lift the hips. Lower slowly.",
+      "progressionId": "dragon",
+      "level": 0
+    },
+    {
+      "id": "wall-handstand-hold",
+      "name": "Wall Handstand Hold",
+      "category": "Shoulders",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Chest to wall or back to wall. Push tall through the shoulders, ribs in. Seconds held.",
+      "gear": "wall"
+    },
+    {
+      "id": "reverse-lunge",
+      "name": "Reverse Lunge",
+      "category": "Quads",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "compound": true,
+      "perSide": true,
+      "cue": "Step back, lower the rear knee toward the floor, drive through the front heel to stand.",
+      "progressionId": "lunge",
+      "level": 0
+    },
+    {
+      "id": "arch-raise",
+      "name": "Arch Raise (Superman)",
+      "category": "Back",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "cue": "Face down, lift chest and thighs together, 1-s hold at the top. Lower back and glutes."
+    },
+    {
+      "id": "bear-crawl",
+      "name": "Bear Crawl",
+      "category": "Full Body",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Hands and feet, knees off the floor, hips low. Opposite hand and foot move together. Seconds.",
+      "gear": "floor space"
+    },
+    {
+      "id": "monkey",
+      "name": "Monkey (lateral)",
+      "category": "Full Body",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "From a deep squat, plant both hands to the side and hop the feet across. Flow side to side. Seconds.",
+      "gear": "floor space"
+    },
+    {
+      "id": "frogger",
+      "name": "Frogger",
+      "category": "Full Body",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Deep squat, hands forward, hop the feet to the hands, repeat. Soft landings. Seconds.",
+      "gear": "floor space"
+    },
+    {
+      "id": "deep-squat-hold",
+      "name": "Deep Squat Hold",
+      "category": "Quads",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Feet flat, chest up, knees pushed out. Shift weight around. Seconds held."
+    },
+    {
+      "id": "dead-hang",
+      "name": "Dead Hang",
+      "category": "Back",
+      "equipment": "bodyweight",
+      "bodyweight": true,
+      "timed": true,
+      "cue": "Relaxed hang, then active hang (shoulders down). Grip and shoulder health. Seconds held.",
+      "gear": "pull-up bar"
+    }
+  ]
+}

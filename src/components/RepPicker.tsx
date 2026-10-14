@@ -4,6 +4,7 @@ import { Sheet } from './Sheet';
 /**
  * Quick-select rep grid around the target range. One tap = logged.
  * "0 / FAIL" and custom entry are available for unusual values.
+ * Timed exercises show seconds in 5-second steps instead of reps.
  */
 export function RepPicker({
   exerciseName,
@@ -11,6 +12,8 @@ export function RepPicker({
   repMin,
   repMax,
   current,
+  timed,
+  target,
   onPick,
   onClose,
 }: {
@@ -19,16 +22,21 @@ export function RepPicker({
   repMin: number;
   repMax: number;
   current: number | null;
+  timed?: boolean;
+  /** today's exact target for this set */
+  target?: number;
   onPick: (reps: number) => void;
   onClose: () => void;
 }) {
   const [custom, setCustom] = useState(false);
   const [customVal, setCustomVal] = useState('');
 
-  const lo = Math.max(1, repMin - 3);
-  const hi = repMax + 2;
+  const step = timed ? 5 : 1;
+  const lo = Math.max(step, repMin - 3 * step);
+  const hi = repMax + 2 * step;
   const options: number[] = [];
-  for (let r = lo; r <= hi; r++) options.push(r);
+  for (let r = lo; r <= hi; r += step) options.push(r);
+  const unit = timed ? 's' : '';
 
   return (
     <Sheet onClose={onClose}>
@@ -36,30 +44,35 @@ export function RepPicker({
         <div>
           <div className="tiny faint">{exerciseName.toUpperCase()}</div>
           <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '0.08em' }}>
-            SET {setNumber} · REPS
+            SET {setNumber} · {timed ? 'SECONDS' : 'REPS'}
           </div>
         </div>
         <div className="tiny dim">
-          TARGET {repMin}–{repMax}
+          TARGET {repMin}–{repMax}{unit}
         </div>
       </div>
       {!custom ? (
         <>
+          {target != null && (
+            <button className="btn btn--green mt16" onClick={() => onPick(target)} aria-label={`hit target ${target}`}>
+              ✓ HIT {target}{unit}
+            </button>
+          )}
           <div className="rep-grid">
             {options.map((r) => (
               <button
                 key={r}
-                className={r >= repMax ? 'max' : r >= repMin ? 'target' : ''}
+                className={`${r >= repMax ? 'max' : r >= repMin ? 'target' : ''}${r === target ? ' goal' : ''}`}
                 onClick={() => onPick(r)}
-                aria-label={`${r} reps`}
+                aria-label={`${r} ${timed ? 'seconds' : 'reps'}`}
               >
-                {r}
+                {r}{unit}
               </button>
             ))}
           </div>
           <div className="row mt16" style={{ gap: 10 }}>
             <button className="btn btn--ghost" style={{ flex: 1 }} onClick={() => onPick(0)}>
-              0 · FAILED
+              0 · {timed ? 'NO HOLD' : 'FAILED'}
             </button>
             <button className="btn btn--ghost" style={{ flex: 1 }} onClick={() => setCustom(true)}>
               OTHER…
@@ -77,7 +90,7 @@ export function RepPicker({
             type="number"
             inputMode="numeric"
             autoFocus
-            placeholder="reps"
+            placeholder={timed ? 'seconds' : 'reps'}
             value={customVal}
             onChange={(e) => setCustomVal(e.target.value)}
           />

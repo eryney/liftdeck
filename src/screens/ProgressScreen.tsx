@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { store, useAppState } from '../store/store';
 import { LineChart } from '../components/LineChart';
 import { bestSet, exerciseHistory, isIncrease, resultLabel } from '../lib/progression';
-import { fmtWeightShort, trimNum } from '../lib/format';
+import { fmtRepList, fmtWeightShort, trimNum } from '../lib/format';
+import { PROGRESSIONS, chainLevels, progressionById } from '../data/progressions';
+import { lastChainPerformance, resolveVariation } from '../lib/variation';
 import { formatDuration, formatShort, todayISO, weekStart, addDays, formatWeekRange } from '../lib/dates';
 import { Confirm, Sheet } from '../components/Sheet';
 import { fmtDelta, movingAverage, waistTrend, weightTrend } from '../lib/body';
@@ -11,10 +13,11 @@ import { boxingLastWeeks, boxingLoad, boxingTypeLabel, boxingWeekStats, BOXING_T
 import { boxingGoal, isFlexPlan, rotationGoal, weekAttainment } from '../lib/flex';
 import { BoxingDetailsSheet } from '../components/BoxingDetails';
 
-type SubView = 'overview' | 'lifts' | 'body' | 'boxing' | 'log';
+type SubView = 'overview' | 'chains' | 'lifts' | 'body' | 'boxing' | 'log';
 
 const VIEWS: { id: SubView; label: string }[] = [
   { id: 'overview', label: 'OVERVIEW' },
+  { id: 'chains', label: 'CHAINS' },
   { id: 'lifts', label: 'LIFTS' },
   { id: 'body', label: 'BODY' },
   { id: 'boxing', label: 'BOXING' },
@@ -23,18 +26,22 @@ const VIEWS: { id: SubView; label: string }[] = [
 
 export function ProgressScreen() {
   const [view, setView] = useState<SubView>('overview');
+  const state = useAppState();
+  const plan = store.activePlan();
+  const showBoxing = !plan || !isFlexPlan(plan) || !!boxingGoal(plan) || state.boxing.length > 0;
   return (
     <div className="screen">
       <div className="topline">TELEMETRY</div>
       <h1 className="title">PROGRESS</h1>
       <div className="chip-row mt8">
-        {VIEWS.map((v) => (
+        {VIEWS.filter((v) => v.id !== 'boxing' || showBoxing).map((v) => (
           <button key={v.id} className={`chip ${view === v.id ? 'on' : ''}`} onClick={() => setView(v.id)}>
             {v.label}
           </button>
         ))}
       </div>
       {view === 'overview' && <OverviewView />}
+      {view === 'chains' && <ChainsView />}
       {view === 'lifts' && <LiftsView />}
       {view === 'body' && <BodyView />}
       {view === 'boxing' && <BoxingView />}
@@ -52,7 +59,11 @@ function useTrackedLifts() {
     if (plan && isFlexPlan(plan)) {
       const rg = rotationGoal(plan);
       for (const tid of rg?.templateIds ?? []) {
-        for (const te of store.templateById(tid)?.exercises ?? []) if (!ids.includes(te.exerciseId)) ids.push(te.exerciseId);
+        for (const te of store.templateById(tid)?.exercises ?? []) {
+          // chain slots track the rung the chain is currently on, not the template's starting rung
+          const cur = resolveVariation(state.sessions, state.exercises, te)?.exerciseId ?? te.exerciseId;
+          if (!ids.includes(cur)) ids.push(cur);
+        }
       }
     }
     if (ids.length === 0) {
@@ -64,7 +75,7 @@ function useTrackedLifts() {
       ids.push(...[...seen.entries()].sort((a, b) => b[1] - a[1]).map(([id]) => id));
     }
     return ids;
-  }, [state.sessions, state.templates, state.plans, state.settings.activePlanId]);
+  }, [state.sessions, state.templates, state.plans, state.settings.activePlanId, state.exercises]);
 }
 
 // ── OVERVIEW ──────────────────────────────────────────────────────────────
@@ -82,6 +93,7 @@ function OverviewView() {
     .map((id) => ({ id, name: store.exerciseById(id)?.name ?? id, t: strengthTrend(state.sessions, id, state.measurements) }))
     .filter((x) => x.t.points.length > 0);
   const goalDate = state.settings.goalMode === 'cut' ? state.settings.goalDate : undefined;
+  const chainRows = useChainStatus();
 
   return (
     <>
@@ -129,6 +141,28 @@ function OverviewView() {
         </div>
       </div>
 
+      {chainRows.length > 0 && (
+        <>
+          <h2 className="section">PROGRESSION CHAINS</h2>
+          <div className="panel">
+            {chainRows.map((c) => (
+              <div key={c.id} className="spread mt8">
+                <span className="small" style={{ flex: 1 }}>
+                  {c.name}
+                  <div className="tiny faint">{c.rungName}</div>
+                </span>
+                <span className="small" style={{ textAlign: 'right' }}>
+                  <span className="purple" style={{ fontWeight: 800 }}>{c.level + 1}</span>
+                  <span className="faint"> / {c.count}</span>
+                  {c.advancedRungs > 0 && <div className="tiny green">▲ {c.advancedRungs} rung{c.advancedRungs > 1 ? 's' : ''} climbed</div>}
+                </span>
+              </div>
+            ))}
+            <div className="faint tiny mt8">Rung = current variation. Hit the rep ceiling on every set and the next session serves the next rung.</div>
+          </div>
+        </>
+      )}
+
       <h2 className="section">STRENGTH · ESTIMATED</h2>
       <div className="panel">
         {trends.length === 0 && <div className="dim small">Complete a few strength sessions and maintenance trends appear here.</div>}
@@ -145,6 +179,154 @@ function OverviewView() {
         })}
         <div className="faint tiny mt8">Rolling e1RM of the last 3 exposures vs the 3 before. Holding steady while the scale drops is the goal.</div>
       </div>
+    </>
+  );
+}
+
+// ── CHAINS ────────────────────────────────────────────────────────────────
+
+interface ChainStatus {
+  id: string;
+  name: string;
+  pattern: string;
+  muscles: string;
+  topNote: string;
+  rungs: { id: string; name: string; firstDone?: string; exposures: number; bestReps: number | null; timed?: boolean }[];
+  level: number;
+  count: number;
+  rungName: string;
+  /** rungs above the lowest rung ever performed */
+  advancedRungs: number;
+  /** rung index per exposure, oldest first, for the chart */
+  points: { date: string; value: number }[];
+  lastDate: string | null;
+}
+
+/** Chains the active plan uses (plus any with history), with current rung and per-rung records. */
+function useChainStatus(): ChainStatus[] {
+  const state = useAppState();
+  return useMemo(() => {
+    const plan = store.activePlan();
+    const slotsByChain = new Map<string, { exerciseId: string; lockVariation?: boolean }>();
+    if (plan && isFlexPlan(plan)) {
+      for (const tid of [...(rotationGoal(plan)?.templateIds ?? []), ...plan.weeklyGoals.flatMap((g) => (g.kind === 'workout' ? [g.templateId] : []))]) {
+        for (const te of store.templateById(tid)?.exercises ?? []) {
+          const ex = state.exercises.find((e) => e.id === te.exerciseId);
+          if (ex?.progressionId && !te.lockVariation && !slotsByChain.has(ex.progressionId)) slotsByChain.set(ex.progressionId, te);
+        }
+      }
+    }
+    const performed = new Set<string>();
+    for (const s of state.sessions) if (s.status === 'completed') for (const es of s.exercises) if (es.progressionId && es.sets.some((x) => x.reps != null)) performed.add(es.progressionId);
+    const ids = [...new Set([...slotsByChain.keys(), ...performed])];
+    const out: ChainStatus[] = [];
+    for (const pid of ids) {
+      const prog = progressionById(pid);
+      const levels = chainLevels(state.exercises, pid);
+      if (!prog || levels.length === 0) continue;
+      const slot = slotsByChain.get(pid) ?? { exerciseId: levels[0].id };
+      const choice = resolveVariation(state.sessions, state.exercises, slot);
+      const level = choice?.level ?? 0;
+      const idIndex = new Map(levels.map((e, i) => [e.id, i]));
+      const rungs = levels.map((e) => ({ id: e.id, name: e.name, exposures: 0, bestReps: null as number | null, timed: e.timed, firstDone: undefined as string | undefined }));
+      const points: { date: string; value: number }[] = [];
+      let lowest = Infinity;
+      let lastDate: string | null = null;
+      for (const s of [...state.sessions].filter((x) => x.status === 'completed').sort((a, b) => a.startedAt - b.startedAt)) {
+        for (const es of s.exercises) {
+          const i = idIndex.get(es.exerciseId);
+          if (i == null || !es.sets.some((x) => x.reps != null)) continue;
+          const r = rungs[i];
+          r.exposures += 1;
+          r.firstDone = r.firstDone ?? s.date;
+          const best = Math.max(...es.sets.map((x) => x.reps ?? 0));
+          r.bestReps = r.bestReps == null ? best : Math.max(r.bestReps, best);
+          points.push({ date: s.date, value: i + 1 });
+          lowest = Math.min(lowest, i);
+          lastDate = s.date;
+        }
+      }
+      out.push({
+        id: pid,
+        name: prog.name,
+        pattern: prog.pattern,
+        muscles: prog.muscles,
+        topNote: prog.topNote,
+        rungs,
+        level,
+        count: levels.length,
+        rungName: levels[level]?.name ?? '',
+        advancedRungs: Number.isFinite(lowest) ? Math.max(0, level - lowest) : 0,
+        points,
+        lastDate,
+      });
+    }
+    // chains in the plan first (in PROGRESSIONS order), then history-only ones
+    const order = new Map(PROGRESSIONS.map((p, i) => [p.id, i]));
+    return out.sort((a, b) => (slotsByChain.has(b.id) ? 1 : 0) - (slotsByChain.has(a.id) ? 1 : 0) || (order.get(a.id) ?? 99) - (order.get(b.id) ?? 99));
+  }, [state.sessions, state.exercises, state.templates, state.plans, state.settings.activePlanId]);
+}
+
+function ChainsView() {
+  const chains = useChainStatus();
+  const [openId, setOpenId] = useState<string | null>(null);
+  const sel = chains.find((c) => c.id === openId) ?? chains[0] ?? null;
+
+  if (!sel) return <div className="panel mt16 center dim small">The active plan has no progression-chain exercises.</div>;
+
+  return (
+    <>
+      <select className="mt16" value={sel.id} onChange={(e) => setOpenId(e.target.value)} aria-label="chain">
+        {chains.map((c) => (
+          <option key={c.id} value={c.id}>
+            {c.name} · rung {c.level + 1}/{c.count}
+          </option>
+        ))}
+      </select>
+
+      <div className="stat-grid">
+        <div className="stat">
+          <div className="num purple">{sel.level + 1}<span className="faint" style={{ fontSize: 13 }}> / {sel.count}</span></div>
+          <div className="lbl">CURRENT RUNG</div>
+        </div>
+        <div className="stat">
+          <div className="num green">{sel.advancedRungs > 0 ? `+${sel.advancedRungs}` : '—'}</div>
+          <div className="lbl">RUNGS CLIMBED</div>
+        </div>
+        <div className="stat">
+          <div className="num">{sel.points.length}</div>
+          <div className="lbl">EXPOSURES</div>
+        </div>
+      </div>
+      <div className="center faint tiny mt8">{sel.pattern} · {sel.muscles}</div>
+
+      <h2 className="section">LADDER</h2>
+      <div className="panel" data-testid="chain-ladder">
+        {sel.rungs.map((r, i) => {
+          const cls = i === sel.level ? 'now' : i < sel.level ? 'past' : '';
+          return (
+            <div key={r.id} className={`ladder-row ${cls}`}>
+              <span className="rung">{i === sel.level ? '▸' : i < sel.level ? '✓' : i + 1}</span>
+              <span style={{ flex: 1 }} className={i === sel.level ? 'cyan' : i < sel.level ? 'dim' : 'faint'}>
+                {r.name}
+                {r.exposures > 0 && (
+                  <div className="tiny faint">
+                    {r.exposures}× · best set {r.bestReps}{r.timed ? ' s' : ''}{r.firstDone ? ` · since ${formatShort(r.firstDone)}` : ''}
+                  </div>
+                )}
+              </span>
+            </div>
+          );
+        })}
+        <div className="faint tiny mt8">TOP OF CHAIN → {sel.topNote}</div>
+      </div>
+
+      {sel.points.length > 1 && (
+        <>
+          <h2 className="section">RUNG OVER TIME</h2>
+          <LineChart series={[{ points: sel.points, color: 'var(--purple)', dots: true }]} unit="rung" />
+        </>
+      )}
     </>
   );
 }
@@ -182,6 +364,10 @@ function LiftsView() {
   const trend = strengthTrend(state.sessions, selId, state.measurements);
   const tl = trendLabelText(trend.label);
   const sysLoad = ex?.bodyweight ? systemLoadHistory(state.sessions, selId, state.measurements) : [];
+  const unloaded = !!ex?.bodyweight && history.every((h) => h.weight === 0);
+  const repPts = history.map((h) => ({ date: h.date, value: h.prescribedReps.reduce((a, b) => a + b, 0) }));
+  const isChain = !!ex?.progressionId;
+  const chainLast = ex?.progressionId ? lastChainPerformance(state.sessions, chainLevels(state.exercises, ex.progressionId).map((e) => e.id)) : null;
 
   return (
     <>
@@ -193,28 +379,52 @@ function LiftsView() {
         ))}
       </select>
 
-      <div className="stat-grid">
-        <div className="stat">
-          <div className="num">{latest ? fmtWeightShort({ weight: latest.weight, bodyweight: ex?.bodyweight }) : '—'}</div>
-          <div className="lbl">{ex?.bodyweight ? 'ADDED · CURRENT' : ex?.perHand ? 'PER HAND · CURRENT' : 'CURRENT'}</div>
+      {isChain && ex && (
+        <div className="tiny purple mt8" style={{ padding: '0 4px' }}>
+          {progressionById(ex.progressionId)?.name} · RUNG {(ex.level ?? 0) + 1}
+          {chainLast && chainLast.es.exerciseId !== selId ? ` · chain is now on ${chainLast.es.name}` : ''}
         </div>
-        <div className="stat">
-          <div className="num">{first ? fmtWeightShort({ weight: first.weight, bodyweight: ex?.bodyweight }) : '—'}</div>
-          <div className="lbl">STARTED</div>
-        </div>
-        <div className="stat">
-          <div className="num">
-            {latest && first ? (latest.weight - first.weight >= 0 ? '+' : '') + trimNum(latest.weight - first.weight) : '—'}
+      )}
+      {unloaded ? (
+        <div className="stat-grid">
+          <div className="stat">
+            <div className="num">{latest ? latest.prescribedReps.reduce((a, b) => a + b, 0) : '—'}</div>
+            <div className="lbl">{ex?.timed ? 'SECONDS · LAST' : 'REPS · LAST'}</div>
           </div>
-          <div className="lbl">CHANGE</div>
+          <div className="stat">
+            <div className="num">{first ? first.prescribedReps.reduce((a, b) => a + b, 0) : '—'}</div>
+            <div className="lbl">{ex?.timed ? 'SECONDS · FIRST' : 'REPS · FIRST'}</div>
+          </div>
+          <div className="stat">
+            <div className="num">{history.length}</div>
+            <div className="lbl">EXPOSURES</div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="stat-grid">
+          <div className="stat">
+            <div className="num">{latest ? fmtWeightShort({ weight: latest.weight, bodyweight: ex?.bodyweight }) : '—'}</div>
+            <div className="lbl">{ex?.bodyweight ? 'ADDED · CURRENT' : ex?.perHand ? 'PER HAND · CURRENT' : 'CURRENT'}</div>
+          </div>
+          <div className="stat">
+            <div className="num">{first ? fmtWeightShort({ weight: first.weight, bodyweight: ex?.bodyweight }) : '—'}</div>
+            <div className="lbl">STARTED</div>
+          </div>
+          <div className="stat">
+            <div className="num">
+              {latest && first ? (latest.weight - first.weight >= 0 ? '+' : '') + trimNum(latest.weight - first.weight) : '—'}
+            </div>
+            <div className="lbl">CHANGE</div>
+          </div>
+        </div>
+      )}
       {best && (
         <div className="center faint tiny mt8">
-          BEST SET · {fmtWeightShort({ weight: best.weight, bodyweight: ex?.bodyweight })} × {best.reps} on {formatShort(best.date)}
+          BEST SET · {fmtWeightShort({ weight: best.weight, bodyweight: ex?.bodyweight })} × {best.reps}{ex?.timed ? ' s' : ''} on {formatShort(best.date)}
         </div>
       )}
 
+      {!unloaded && (
       <div className="panel mt16">
         <div className="spread">
           <span className="tiny faint">STRENGTH MAINTENANCE · ESTIMATED 1RM{trend.systemLoad ? ' (TOTAL SYSTEM LOAD)' : ''}</span>
@@ -236,9 +446,20 @@ function LiftsView() {
           <div className="faint tiny mt8">Needs work sets of 1–12 reps with external load.</div>
         )}
       </div>
+      )}
 
-      <h2 className="section">{ex?.bodyweight ? 'ADDED LOAD' : 'WORKING WEIGHT'} OVER TIME</h2>
-      <LineChart series={[{ points: weightPts, color: 'var(--cyan)', dots: true }]} unit={ex?.perHand ? 'lb / hand' : 'lb'} />
+      {unloaded ? (
+        <>
+          <h2 className="section">{ex?.timed ? 'TOTAL SECONDS' : 'TOTAL REPS'} · PRESCRIBED SETS</h2>
+          <LineChart series={[{ points: repPts, color: 'var(--cyan)', dots: true }]} unit={ex?.timed ? 's' : 'reps'} />
+          <div className="faint tiny mt8" style={{ padding: '0 4px' }}>Bodyweight work with no added load. Progress shows as reps on this rung, then as a move up the chain (see CHAINS).</div>
+        </>
+      ) : (
+        <>
+          <h2 className="section">{ex?.bodyweight ? 'ADDED LOAD' : 'WORKING WEIGHT'} OVER TIME</h2>
+          <LineChart series={[{ points: weightPts, color: 'var(--cyan)', dots: true }]} unit={ex?.perHand ? 'lb / hand' : 'lb'} />
+        </>
+      )}
 
       {trend.points.length > 1 && (
         <>
@@ -256,12 +477,12 @@ function LiftsView() {
 
       <h2 className="section">RECENT SESSIONS</h2>
       {[...history].reverse().slice(0, 10).map((h, i) => {
-        const lbl = resultLabel(h.result);
+        const lbl = resultLabel(h.result, isChain);
         return (
           <div key={i} className="spread panel mt8" style={{ padding: '10px 14px' }}>
             <span className="dim small">{formatShort(h.date)}</span>
             <span className="small">
-              {fmtWeightShort({ weight: h.weight, bodyweight: ex?.bodyweight })} × {h.reps.join(', ')}
+              {fmtWeightShort({ weight: h.weight, bodyweight: ex?.bodyweight })} × {fmtRepList(h.reps, ex?.timed)}
               {h.finalSetRir != null && <span className="faint tiny"> · RIR {h.finalSetRir}</span>}
             </span>
             <span className={`tiny ${lbl.cls}`}>{lbl.glyph} {lbl.text}</span>
@@ -580,7 +801,7 @@ function LogView() {
             {openSession.exercises
               .filter((es) => es.sets.some((x) => x.reps != null))
               .map((es) => {
-                const lbl = resultLabel(es.result);
+                const lbl = resultLabel(es.result, !!es.progressionId);
                 return (
                   <div key={es.id} className="spread mt8">
                     <span className="small">
@@ -588,7 +809,7 @@ function LogView() {
                       {es.substitutedFor && <span className="purple tiny"> · sub</span>}
                     </span>
                     <span className="small dim">
-                      {fmtWeightShort(es)} × {es.sets.filter((x) => x.reps != null).map((x) => x.reps).join(', ')}
+                      {fmtWeightShort(es)} × {fmtRepList(es.sets.map((x) => x.reps), es.timed)}
                       {lbl.text && <span className={lbl.cls}> {lbl.glyph}</span>}
                       {isIncrease(es.result) ? '' : ''}
                     </span>

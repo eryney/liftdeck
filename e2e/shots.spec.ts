@@ -17,12 +17,12 @@ test('capture screens', async ({ page }) => {
   test.setTimeout(120_000);
   await boot(page);
   await page.screenshot({ path: `${OUT}/01-onboarding.png` });
-  await page.getByRole('button', { name: 'BOXER CUT // FLEX' }).click();
+  await page.getByRole('button', { name: 'CALISTHENICS CUT // FLEX' }).click();
   await page.screenshot({ path: `${OUT}/02-plan-preview.png` });
   await page.getByRole('button', { name: "LET'S GO" }).click();
   await page.screenshot({ path: `${OUT}/03-today.png`, fullPage: true });
 
-  await page.getByRole('button', { name: 'START STRENGTH A' }).click();
+  await page.getByRole('button', { name: 'START UPPER A' }).click();
   await page.screenshot({ path: `${OUT}/04-workout.png` });
   await page.locator('.set-row--next').first().click();
   await page.waitForTimeout(300);
@@ -58,14 +58,11 @@ test('capture screens', async ({ page }) => {
   await page.getByRole('button', { name: 'DONE' }).click();
   await page.screenshot({ path: `${OUT}/10-today-complete.png`, fullPage: true });
 
-  // boxing one tap + details
-  await page.getByRole('button', { name: 'BOXING DONE ✓' }).click();
-  await page.screenshot({ path: `${OUT}/10b-boxing-details.png` });
-  await page.getByRole('button', { name: 'SPAR' }).click();
-  await page.locator('.sheet').getByRole('button', { name: '60', exact: true }).click();
-  await page.getByRole('button', { name: 'rpe 8' }).click();
-  await page.locator('.sheet').getByRole('button', { name: 'DONE' }).click();
-  await page.screenshot({ path: `${OUT}/10c-today-boxed.png`, fullPage: true });
+  // progression chains view
+  await page.getByRole('button', { name: 'PROGRESS' }).click();
+  await page.getByRole('button', { name: 'CHAINS' }).click();
+  await page.screenshot({ path: `${OUT}/10b-chains.png`, fullPage: true });
+  await page.getByRole('button', { name: 'TODAY' }).click();
 
   // body weight entries for chart
   await page.getByRole('button', { name: 'PROGRESS' }).click();
@@ -86,18 +83,17 @@ test('capture screens', async ({ page }) => {
   await page.screenshot({ path: `${OUT}/11b-overview.png`, fullPage: true });
   await page.getByRole('button', { name: 'LIFTS' }).click();
   await page.screenshot({ path: `${OUT}/12-lifts.png`, fullPage: true });
-  await page.getByRole('button', { name: 'BOXING', exact: true }).click();
   await page.screenshot({ path: `${OUT}/12b-boxing.png`, fullPage: true });
 
   await page.getByRole('button', { name: 'CALENDAR' }).click();
   await page.screenshot({ path: `${OUT}/13-calendar.png`, fullPage: true });
-  await page.getByRole('button', { name: '2026-09-01 box a' }).click();
+  await page.getByRole('button', { name: '2026-09-01 a' }).click();
   await page.screenshot({ path: `${OUT}/14-day-sheet.png` });
   await page.locator('.sheet-backdrop').click({ position: { x: 10, y: 10 } });
 
   await page.getByRole('button', { name: 'PLAN', exact: true }).click();
   await page.screenshot({ path: `${OUT}/15-plan.png`, fullPage: true });
-  await page.locator('.list-row', { hasText: 'STRENGTH A' }).getByRole('button').first().click();
+  await page.locator('.list-row', { hasText: 'UPPER A' }).getByRole('button').first().click();
   await page.screenshot({ path: `${OUT}/16-template-editor.png`, fullPage: true });
 
   await page.getByRole('button', { name: 'SETTINGS' }).click();

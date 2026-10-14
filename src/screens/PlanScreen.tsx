@@ -5,7 +5,8 @@ import { WEEKDAY_NAMES, todayISO } from '../lib/dates';
 import { newId } from '../lib/ids';
 import { Confirm, Sheet } from '../components/Sheet';
 import { ExercisePicker } from '../components/ExercisePicker';
-import { trimNum } from '../lib/format';
+import { fmtRange, trimNum } from '../lib/format';
+import { progressionById } from '../data/progressions';
 import { isFlexPlan, nextRotationTemplateId, rotationGoal } from '../lib/flex';
 import { buildPlanBundle, parsePlanBundle, resolveBundle } from '../lib/planBundle';
 import type { ResolvedBundle } from '../lib/planBundle';
@@ -658,13 +659,21 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
               </button>
             </div>
             <button style={{ flex: 1, textAlign: 'left' }} onClick={() => setConfiguring(te.id)}>
-              <div>{ex?.name ?? te.exerciseId}</div>
+              <div>
+                {ex?.name ?? te.exerciseId}
+                {te.superset && i < tpl.exercises.length - 1 && <span className="cyan tiny"> ⇄</span>}
+              </div>
               <div className="tiny faint">
-                {te.sets} × {te.repMin}–{te.repMax}
-                {ex?.perSide ? ' / side' : ''} · +{trimNum(te.increment)}
-                {ex?.perHand ? '/hand' : ex?.bodyweight ? ' added' : ''} · rest {te.restSec}s
+                {te.sets} × {fmtRange(te.repMin, te.repMax, ex?.timed)}
+                {ex?.perSide ? ' / side' : ''}
+                {ex?.bodyweight ? '' : ` · +${trimNum(te.increment)}${ex?.perHand ? '/hand' : ''}`} · rest {te.restSec}s
                 {te.targetRir != null ? ` · RIR ${te.targetRir}` : ''}
               </div>
+              {ex?.progressionId && (
+                <div className={`tiny ${te.lockVariation ? 'amber' : 'purple'}`}>
+                  {progressionById(ex.progressionId)?.name ?? 'CHAIN'} · rung {(ex.level ?? 0) + 1}{te.lockVariation ? ' · LOCKED' : ' · follows the chain'}
+                </div>
+              )}
             </button>
             <button
               className="btn btn--ghost btn--small red"
@@ -685,20 +694,24 @@ function TemplateEditor({ template, onBack }: { template: WorkoutTemplate; onBac
         <ExercisePicker
           onPick={(ex) => {
             const settings = store.state.settings;
-            save([
-              ...tpl.exercises,
-              {
-                id: newId('te'),
-                exerciseId: ex.id,
-                sets: ex.compound ? 3 : 2,
-                repMin: ex.compound ? 6 : 10,
-                repMax: ex.compound ? 10 : 15,
-                restSec: ex.compound ? settings.compoundRestSec : settings.isolationRestSec,
-                increment: ex.equipment === 'dumbbell' && ex.compound && ['Chest', 'Shoulders', 'Back'].includes(ex.category) ? 2.5 : ex.equipment === 'cable' || ex.bodyweight ? 2.5 : settings.defaultIncrement,
-                startWeight: 0,
-                targetRir: ex.compound ? 2 : 1,
-              },
-            ]);
+            // sensible defaults: holds 20–40 s, bodyweight compounds 3×8–12 (pulls 5–8), isolation 2×10–15
+            const isPull = ex.progressionId === 'pull' || ex.progressionId === 'chin';
+            const slot: TemplateExercise = ex.timed
+              ? { id: newId('te'), exerciseId: ex.id, sets: 3, repMin: 20, repMax: 40, restSec: 45, increment: 2.5, startWeight: 0, targetRir: 1 }
+              : ex.bodyweight
+                ? { id: newId('te'), exerciseId: ex.id, sets: ex.compound ? 3 : 2, repMin: isPull ? 5 : ex.compound ? 8 : 10, repMax: isPull ? 8 : ex.compound ? 12 : 15, restSec: ex.compound ? 75 : 45, increment: 5, startWeight: 0, targetRir: ex.compound ? 2 : 1 }
+                : {
+                    id: newId('te'),
+                    exerciseId: ex.id,
+                    sets: ex.compound ? 3 : 2,
+                    repMin: ex.compound ? 6 : 10,
+                    repMax: ex.compound ? 10 : 15,
+                    restSec: ex.compound ? settings.compoundRestSec : settings.isolationRestSec,
+                    increment: ex.equipment === 'dumbbell' && ex.compound && ['Chest', 'Shoulders', 'Back'].includes(ex.category) ? 2.5 : ex.equipment === 'cable' ? 2.5 : settings.defaultIncrement,
+                    startWeight: 0,
+                    targetRir: ex.compound ? 2 : 1,
+                  };
+            save([...tpl.exercises, slot]);
             setAdding(false);
           }}
           onClose={() => setAdding(false)}
@@ -771,18 +784,35 @@ function ExerciseConfigSheet({
       </div>
     </div>
   );
-  const incHint = ex?.bodyweight ? 'ADDED load, total' : ex?.perHand ? 'PER HAND (each dumbbell)' : ex?.equipment === 'cable' ? 'smallest practical stack step' : undefined;
+  const incHint = ex?.bodyweight ? 'backpack step once the chain is topped out' : ex?.perHand ? 'PER HAND (each dumbbell)' : ex?.equipment === 'cable' ? 'smallest practical stack step' : undefined;
+  const chain = ex?.progressionId ? progressionById(ex.progressionId) : undefined;
+  const toggle = (label: string, key: 'superset' | 'lockVariation', hint: string) => (
+    <div className="spread mt8">
+      <span className="small dim">
+        {label}
+        <div className="tiny faint">{hint}</div>
+      </span>
+      <button className={`chip ${v[key] ? 'on' : ''}`} onClick={() => setV({ ...v, [key]: v[key] ? undefined : true })} aria-pressed={!!v[key]}>
+        {v[key] ? 'ON' : 'OFF'}
+      </button>
+    </div>
+  );
   return (
     <Sheet onClose={onClose}>
       <div className="tiny faint">CONFIGURE</div>
       <div style={{ fontSize: 17, fontWeight: 800 }}>{ex?.name}</div>
-      {num('SETS', 'sets', 1, 1)}
-      {num('REP MIN', 'repMin', 1, 1)}
-      {num('REP MAX', 'repMax', 1, 1)}
-      {num('REST (SEC)', 'restSec', 15, 15)}
-      {num('INCREMENT (LB)', 'increment', 1.25, 1.25, incHint)}
-      {num(ex?.bodyweight ? 'START ADDED WT' : ex?.perHand ? 'START WEIGHT / HAND' : 'START WEIGHT', 'startWeight', 2.5, 0)}
-      {num('TARGET RIR', 'targetRir', 1, 0, 'reps in reserve · telemetry only')}
+      {chain && <div className="tiny purple">{chain.name} · rung {(ex?.level ?? 0) + 1} · {chain.muscles}</div>}
+      <div style={{ maxHeight: '58dvh', overflowY: 'auto' }}>
+        {num('SETS', 'sets', 1, 1)}
+        {num(ex?.timed ? 'MIN SECONDS' : 'REP MIN', 'repMin', ex?.timed ? 5 : 1, 1)}
+        {num(ex?.timed ? 'MAX SECONDS' : 'REP MAX', 'repMax', ex?.timed ? 5 : 1, 1, chain ? 'every set here → next rung' : undefined)}
+        {num('REST (SEC)', 'restSec', 15, 15)}
+        {num(ex?.bodyweight ? 'ADDED-LOAD STEP (LB)' : 'INCREMENT (LB)', 'increment', 1.25, 1.25, incHint)}
+        {!ex?.bodyweight && num(ex?.perHand ? 'START WEIGHT / HAND' : 'START WEIGHT', 'startWeight', 2.5, 0)}
+        {num('TARGET RIR', 'targetRir', 1, 0, 'reps in reserve · telemetry only')}
+        {toggle('SUPERSET WITH NEXT', 'superset', 'alternate sets with the slot below (antagonist pair)')}
+        {chain && toggle('LOCK VARIATION', 'lockVariation', 'stay on this rung · never follow the chain')}
+      </div>
       <div className="row mt16" style={{ gap: 10 }}>
         <button className="btn btn--ghost" style={{ flex: 1 }} onClick={onSwap}>
           SWAP EXERCISE

@@ -1,6 +1,6 @@
 import type { Exercise, FixedWorkoutPlan, FlexWorkoutPlan, PlanBundle, WeeklyGoal, WorkoutPlan, WorkoutTemplate } from '../types';
 import { PLAN_BUNDLE_VERSION } from '../types';
-import { EXERCISE_LIBRARY } from '../data/exercises';
+import { EXERCISE_LIBRARY, V1_LIBRARY_IDS } from '../data/exercises';
 import { isFlexPlan } from './flex';
 
 /**
@@ -40,9 +40,8 @@ export function buildPlanBundle(plan: WorkoutPlan, templates: WorkoutTemplate[],
   return { app: 'liftdeck-plan', schemaVersion: PLAN_BUNDLE_VERSION, exportedAt: new Date().toISOString(), plan, templates: tpls, exercises: exs };
 }
 
-/** Exercises that existed in the v1 library (everything except v2 additions). */
-const V2_LIBRARY_ADDITIONS = new Set(['cable-leg-curl']);
-const LEGACY_LIBRARY_IDS = new Set(EXERCISE_LIBRARY.map((e) => e.id).filter((id) => !V2_LIBRARY_ADDITIONS.has(id)));
+/** Exercises that existed in the v1 library. Anything newer travels inside the bundle so older apps can import it. */
+const LEGACY_LIBRARY_IDS = V1_LIBRARY_IDS;
 
 function isObj(x: unknown): x is Record<string, unknown> {
   return !!x && typeof x === 'object' && !Array.isArray(x);
@@ -83,7 +82,13 @@ function validateTemplate(t: unknown, i: number): WorkoutTemplate {
       if (!isNum(te[k])) throw new Error(`Template "${t.name}" · "${te.exerciseId}" has a non-numeric ${k}.`);
     }
     if (te.targetRir != null && !isNum(te.targetRir)) throw new Error(`Template "${t.name}" · "${te.exerciseId}" has a non-numeric targetRir.`);
+    for (const k of ['superset', 'lockVariation'] as const) {
+      if (te[k] != null && typeof te[k] !== 'boolean') throw new Error(`Template "${t.name}" · "${te.exerciseId}" has a non-boolean ${k}.`);
+    }
   });
+  if (t.warmup != null && (!Array.isArray(t.warmup) || !t.warmup.every((w) => typeof w === 'string'))) {
+    throw new Error(`Template "${t.name}" has a malformed warmup list.`);
+  }
   return t as unknown as WorkoutTemplate;
 }
 
@@ -92,6 +97,8 @@ function validateExercise(e: unknown, i: number): Exercise {
   if (typeof e.id !== 'string' || !e.id) throw new Error(`Exercise #${i + 1} is missing an id.`);
   if (typeof e.name !== 'string' || !e.name) throw new Error(`Exercise "${e.id}" is missing a name.`);
   if (typeof e.category !== 'string' || typeof e.equipment !== 'string') throw new Error(`Exercise "${e.id}" needs category and equipment.`);
+  if (e.progressionId != null && typeof e.progressionId !== 'string') throw new Error(`Exercise "${e.id}" has a non-string progressionId.`);
+  if (e.level != null && !isNum(e.level)) throw new Error(`Exercise "${e.id}" has a non-numeric level.`);
   return e as unknown as Exercise;
 }
 

@@ -8,7 +8,7 @@ import type { DayStatus } from '../lib/adherence';
 import { Confirm, Sheet } from '../components/Sheet';
 import { RepPicker } from '../components/RepPicker';
 import { BoxingDetailsSheet } from '../components/BoxingDetails';
-import { fmtWeightShort } from '../lib/format';
+import { fmtRepList, fmtWeightShort } from '../lib/format';
 import { dayRecord, foundationStreak, isFlexPlan, targetWeeks, weekAttainment, weekSummaryLine } from '../lib/flex';
 import { isIncrease, resultLabel } from '../lib/progression';
 import type { FlexWorkoutPlan, WorkoutSession } from '../types';
@@ -214,7 +214,7 @@ function FlexDaySheet({ plan, date, onClose }: { plan: FlexWorkoutPlan; date: st
               const lbl = resultLabel(es.result);
               return (
                 <div key={es.id} className="tiny dim mt8">
-                  {es.name} · {fmtWeightShort(es)} × {es.sets.filter((x) => x.reps != null).map((x) => x.reps).join(', ')}
+                  {es.name} · {fmtWeightShort(es)} × {fmtRepList(es.sets.map((x) => x.reps), es.timed)}
                   {lbl.text && <span className={lbl.cls}> {lbl.glyph}</span>}
                 </div>
               );
@@ -400,7 +400,7 @@ function FixedDaySheet({ date, onClose }: { date: string; onClose: () => void })
             .filter((es) => es.sets.some((x) => x.reps != null))
             .map((es) => (
               <div key={es.id} className="tiny dim mt8">
-                {es.name} · {fmtWeightShort(es)} × {es.sets.filter((x) => x.reps != null).map((x) => x.reps).join(', ')}
+                {es.name} · {fmtWeightShort(es)} × {fmtRepList(es.sets.map((x) => x.reps), es.timed)}
                 {isIncrease(es.result) && <span className="green"> ▲</span>}
               </div>
             ))}

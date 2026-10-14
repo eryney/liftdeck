@@ -122,6 +122,15 @@ export function SettingsScreen() {
           <i />
         </button>
       </div>
+      <div className="spread panel mt8" style={{ padding: '10px 14px' }}>
+        <span className="small">
+          ASK RIR AFTER THE FINAL SET
+          <div className="tiny faint">telemetry only · never changes targets</div>
+        </span>
+        <button className={`toggle ${s.askRir ? 'on' : ''}`} onClick={() => store.updateSettings({ askRir: !s.askRir })} aria-label="toggle rir prompt">
+          <i />
+        </button>
+      </div>
 
       <h2 className="section">DATA</h2>
       <div className="panel">

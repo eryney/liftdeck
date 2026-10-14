@@ -143,8 +143,8 @@ describe('csv', () => {
     ];
     const lines = sessionsToCSV(sessions).split('\n');
     expect(lines).toHaveLength(4);
-    expect(lines[1]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",1,45,15,increase,yes,');
-    expect(lines[2]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",2,45,15,increase,yes,1');
-    expect(lines[3]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",3,45,9,increase,extra,');
+    expect(lines[1]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",1,45,15,,increase,yes,');
+    expect(lines[2]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",2,45,15,,increase,yes,1');
+    expect(lines[3]).toBe('2026-08-02,STRENGTH A,"Incline, ""DB"" Press",3,45,9,,increase,extra,');
   });
 });

@@ -66,6 +66,7 @@ export function defaultSettings(): AppSettings {
     maWindowDays: 7,
     soundOn: true,
     vibrateOn: true,
+    askRir: false,
     goalMode: null,
     seedMarkers: [],
   };
