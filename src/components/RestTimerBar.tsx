@@ -4,7 +4,7 @@ import type { RestTimer } from '../store/store';
 import { formatClock } from '../lib/dates';
 import { beepTimerDone, vibrate } from '../lib/sound';
 
-export function RestTimerBar({ timer }: { timer: RestTimer }) {
+export function RestTimerBar({ timer, solo }: { timer: RestTimer; solo?: boolean }) {
   const [now, setNow] = useState(Date.now());
   const firedFor = useRef<string | null>(null);
 
@@ -28,21 +28,19 @@ export function RestTimerBar({ timer }: { timer: RestTimer }) {
   const pct = Math.min(100, ((timer.totalSec - remaining) / timer.totalSec) * 100);
 
   return (
-    <div className="rest-bar">
+    <div className={`rest-bar ${solo ? 'rest-bar--solo' : ''}`} data-testid="rest-bar">
       <div className={`rest-bar__inner ${done ? 'done' : ''}`}>
         {done ? (
           <>
-            <div className="rest-time green blink">GO</div>
-            <div className="green small" style={{ flex: 1, letterSpacing: '0.14em', fontWeight: 700 }}>
-              REST COMPLETE
-            </div>
+            <div className="rest-time green">Go</div>
+            <div className="green small bold grow">Rest done</div>
             <button className="btn btn--small btn--ghost" onClick={() => store.clearRest()}>
               OK
             </button>
           </>
         ) : (
           <>
-            <div className="rest-time cyan">{formatClock(remaining)}</div>
+            <div className="rest-time">{formatClock(remaining)}</div>
             <div className="rest-track" aria-hidden>
               <i style={{ width: `${pct}%` }} />
             </div>
@@ -50,7 +48,7 @@ export function RestTimerBar({ timer }: { timer: RestTimer }) {
               +30
             </button>
             <button className="btn btn--small btn--ghost" onClick={() => store.clearRest()}>
-              SKIP
+              Skip
             </button>
           </>
         )}

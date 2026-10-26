@@ -1,170 +1,83 @@
 import { describe, expect, it } from 'vitest';
-import {
-  dayRecord, foundationStreak, goalCount, isFixedPlan, isFlexPlan, nextRotationTemplateId, planMode, rotationLetter,
-  sessionTag, targetWeeks, weekAttainment, weekSummaryLine,
-} from '../src/lib/flex';
-import { BOXER_CUT_PLAN, BC_TPL_A, BC_TPL_B, BC_TPL_OPT } from '../src/data/seedPlan';
-import type { BoxingAttendance, WorkoutSession } from '../src/types';
-
-// 2026-08-31 is a Monday
-const MON = '2026-08-31';
-const TUE = '2026-09-01';
-const WED = '2026-09-02';
-const THU = '2026-09-03';
-const FRI = '2026-09-04';
-const SAT = '2026-09-05';
-const SUN = '2026-09-06';
-const NEXT_MON = '2026-09-07';
-const PREV_SUN = '2026-08-30';
+import { dayRecord, foundationStreak, goalCount, nextRotationTemplateId, optionalTemplateIds, strengthTemplateIds, targetWeeks, weekAttainment } from '../src/lib/flex';
+import { SEED_PLAN, TPL_FLOW, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import type { WorkoutSession } from '../src/types';
 
 let n = 0;
-function ws(date: string, templateId: string, hour = 18): WorkoutSession {
-  const startedAt = new Date(`${date}T${String(hour).padStart(2, '0')}:00:00`).getTime();
-  return { id: `ws-${++n}`, date, name: 'X', templateId, status: 'completed', startedAt, finishedAt: startedAt + 3600000, exercises: [] };
+function ws(date: string, templateId: string, status: WorkoutSession['status'] = 'completed'): WorkoutSession {
+  n += 1;
+  const t = new Date(`${date}T10:00:00`).getTime() + n;
+  return { id: `ws${n}`, date, name: templateId, templateId, status, startedAt: t, finishedAt: t + 3_000_000, exercises: [] };
 }
-function box(date: string, extra: Partial<BoxingAttendance> = {}): BoxingAttendance {
-  return { id: `bx-${++n}`, date, loggedAt: new Date(`${date}T19:00:00`).getTime(), ...extra };
-}
-const plan = BOXER_CUT_PLAN;
 
-describe('plan mode', () => {
-  it('records without mode are fixed plans', () => {
-    const legacy = { id: 'p', name: 'OLD', schedule: [] } as any;
-    expect(isFixedPlan(legacy)).toBe(true);
-    expect(isFlexPlan(legacy)).toBe(false);
-    expect(planMode(legacy)).toBe('fixed');
-    expect(planMode(plan)).toBe('flex');
-  });
-});
+const plan = SEED_PLAN;
+const rot = plan.weeklyGoals.find((g) => g.kind === 'rotation')!;
+const flow = plan.weeklyGoals.find((g) => g.kind === 'workout')!;
 
 describe('weekly attainment', () => {
-  it('boxing on ANY day contributes; no weekday is ever "missed"', () => {
-    const w = weekAttainment({ plan, sessions: [], boxing: [box(WED), box(SUN)] }, THU);
-    const bg = w.goals.find((g) => g.goal.kind === 'boxing')!;
-    expect(bg.count).toBe(2);
-    expect(bg.minMet).toBe(true);
-    expect(JSON.stringify(w)).not.toMatch(/missed/i);
-  });
-
-  it('2 boxing sessions meets the minimum, 4 meets the target', () => {
-    const two = weekAttainment({ plan, sessions: [], boxing: [box(MON), box(TUE)] }, THU).goals[0];
-    expect(two.minMet).toBe(true);
-    expect(two.targetMet).toBe(false);
-    const four = weekAttainment({ plan, sessions: [], boxing: [box(MON), box(TUE), box(FRI), box(SAT)] }, THU).goals[0];
-    expect(four.targetMet).toBe(true);
-  });
-
-  it('1 strength session meets the minimum, 2 meets the target', () => {
-    const one = weekAttainment({ plan, sessions: [ws(SAT, BC_TPL_A)], boxing: [] }, SAT).goals[1];
-    expect(one.count).toBe(1);
-    expect(one.minMet).toBe(true);
-    expect(one.targetMet).toBe(false);
-    const two = weekAttainment({ plan, sessions: [ws(TUE, BC_TPL_A), ws(FRI, BC_TPL_B)], boxing: [] }, SAT).goals[1];
-    expect(two.targetMet).toBe(true);
-  });
-
-  it('a 3-boxing week with 1 strength is a FOUNDATION week, not a failure', () => {
-    const w = weekAttainment({ plan, sessions: [ws(WED, BC_TPL_A)], boxing: [box(MON), box(THU), box(SAT)] }, SUN);
+  it('counts rotation sessions Mon–Sun regardless of weekday; optional goals never gate the verdict', () => {
+    // week of Mon 2026-08-31
+    const sessions = [ws('2026-08-31', TPL_UA), ws('2026-09-01', TPL_LA), ws('2026-09-05', TPL_UB), ws('2026-09-06', TPL_FLOW)];
+    const w = weekAttainment({ plan, sessions }, '2026-09-03');
+    expect(w.weekStart).toBe('2026-08-31');
+    expect(w.weekEnd).toBe('2026-09-06');
+    expect(w.goals.find((g) => g.goal.id === rot.id)).toMatchObject({ count: 3, minMet: true, targetMet: false, optional: false });
+    expect(w.goals.find((g) => g.goal.id === flow.id)).toMatchObject({ count: 1, optional: true });
     expect(w.foundation).toBe(true);
     expect(w.target).toBe(false);
+    const w2 = weekAttainment({ plan, sessions: [...sessions, ws('2026-09-06', TPL_LB)] }, '2026-09-06');
+    expect(w2.target).toBe(true);
   });
 
-  it('the ideal week hits TARGET', () => {
-    const w = weekAttainment({ plan, sessions: [ws(TUE, BC_TPL_A), ws(FRI, BC_TPL_B)], boxing: [box(MON), box(WED), box(SAT), box(SUN)] }, SUN);
-    expect(w.foundation).toBe(true);
-    expect(w.target).toBe(true);
+  it('ignores active sessions and sessions outside the week', () => {
+    const sessions = [ws('2026-08-30', TPL_UA), ws('2026-09-07', TPL_LA), ws('2026-09-02', TPL_UB, 'active')];
+    expect(goalCount(rot, { sessions }, '2026-08-31', '2026-09-06')).toBe(0);
   });
 
-  it('accessory work never affects adherence', () => {
-    const acc = [ws(MON, BC_TPL_OPT), ws(WED, BC_TPL_OPT), ws(FRI, BC_TPL_OPT)];
-    const w = weekAttainment({ plan, sessions: acc, boxing: [] }, SUN);
-    expect(w.foundation).toBe(false);
-    expect(w.target).toBe(false);
-    expect(w.goals[1].count).toBe(0); // strength unaffected
-    expect(w.goals[2].count).toBe(3);
-    expect(w.goals[2].optional).toBe(true);
-    // and adding them to a full week changes nothing
-    const full = weekAttainment({ plan, sessions: [ws(TUE, BC_TPL_A), ws(FRI, BC_TPL_B), ...acc], boxing: [box(MON), box(WED), box(SAT), box(SUN)] }, SUN);
-    expect(full.target).toBe(true);
-  });
-
-  it('weekly counts reset on Monday', () => {
-    const boxing = [box(PREV_SUN), box(MON)];
-    expect(goalCount(plan.weeklyGoals[0], { sessions: [], boxing }, MON, SUN)).toBe(1);
-    const prev = weekAttainment({ plan, sessions: [], boxing }, PREV_SUN);
-    expect(prev.goals[0].count).toBe(1);
-    const cur = weekAttainment({ plan, sessions: [ws(PREV_SUN, BC_TPL_A)], boxing }, MON);
-    expect(cur.goals[1].count).toBe(0);
-    expect(cur.weekStart).toBe(MON);
-    expect(cur.weekEnd).toBe(SUN);
-  });
-
-  it('summary line reads BOX x/4 · STR y/2', () => {
-    const w = weekAttainment({ plan, sessions: [ws(TUE, BC_TPL_A)], boxing: [box(MON), box(WED), box(SAT)] }, SUN);
-    expect(weekSummaryLine(w)).toBe('BOX 3/4 · STR 1/2');
+  it('helpers know which templates are strength and which are optional', () => {
+    expect(strengthTemplateIds(plan)).toEqual([TPL_UA, TPL_LA, TPL_UB, TPL_LB]);
+    expect(optionalTemplateIds(plan)).toEqual([TPL_FLOW]);
   });
 });
 
-describe('A/B rotation', () => {
-  const rg = plan.weeklyGoals[1] as Extract<(typeof plan.weeklyGoals)[number], { kind: 'rotation' }>;
-
-  it('starts at A with no history', () => {
-    expect(nextRotationTemplateId(rg, [])).toBe(BC_TPL_A);
-  });
-
-  it('is determined by the most recently COMPLETED rotation session', () => {
-    expect(nextRotationTemplateId(rg, [ws(TUE, BC_TPL_A)])).toBe(BC_TPL_B);
-    expect(nextRotationTemplateId(rg, [ws(TUE, BC_TPL_A), ws(FRI, BC_TPL_B)])).toBe(BC_TPL_A);
-    // an active (unfinished) session does not advance it
-    const active = { ...ws(SAT, BC_TPL_A), status: 'active' as const };
-    expect(nextRotationTemplateId(rg, [ws(TUE, BC_TPL_A), ws(FRI, BC_TPL_B), active])).toBe(BC_TPL_A);
-  });
-
-  it('does NOT reset on Monday', () => {
-    // Sunday A → Monday next should be B
-    expect(nextRotationTemplateId(rg, [ws(PREV_SUN, BC_TPL_A)])).toBe(BC_TPL_B);
-    expect(nextRotationTemplateId(rg, [ws(SAT, BC_TPL_B), ws(SUN, BC_TPL_A)])).toBe(BC_TPL_B);
-  });
-
-  it('ignores optional/other sessions and letters map to slots', () => {
-    expect(nextRotationTemplateId(rg, [ws(TUE, BC_TPL_A), ws(WED, BC_TPL_OPT)])).toBe(BC_TPL_B);
-    expect(rotationLetter(rg, BC_TPL_A)).toBe('A');
-    expect(rotationLetter(rg, BC_TPL_B)).toBe('B');
-    expect(rotationLetter(rg, BC_TPL_OPT)).toBeNull();
+describe('rotation', () => {
+  it('is driven only by the most recently completed rotation session, never by the calendar', () => {
+    expect(nextRotationTemplateId(rot as any, [])).toBe(TPL_UA);
+    expect(nextRotationTemplateId(rot as any, [ws('2026-09-01', TPL_UA)])).toBe(TPL_LA);
+    expect(nextRotationTemplateId(rot as any, [ws('2026-09-01', TPL_UA), ws('2026-09-02', TPL_LA)])).toBe(TPL_UB);
+    // Monday does not reset it
+    expect(nextRotationTemplateId(rot as any, [ws('2026-09-06', TPL_LB)])).toBe(TPL_UA);
+    expect(nextRotationTemplateId(rot as any, [ws('2026-09-06', TPL_UB)])).toBe(TPL_LB);
+    // optional sessions and active sessions do not move it
+    expect(nextRotationTemplateId(rot as any, [ws('2026-09-01', TPL_UA), ws('2026-09-02', TPL_FLOW), ws('2026-09-03', TPL_LA, 'active')])).toBe(TPL_LA);
   });
 });
 
-describe('training record (calendar)', () => {
-  it('blank days are neutral', () => {
-    const r = dayRecord(WED, { plan, sessions: [], boxing: [] });
-    expect(r.tags).toEqual([]);
+describe('streaks', () => {
+  it('foundation streak walks back over weeks at the minimum; the current week never breaks it', () => {
+    const sessions = [
+      ws('2026-08-17', TPL_UA), ws('2026-08-19', TPL_LA), ws('2026-08-21', TPL_UB), // week 1: 3
+      ws('2026-08-24', TPL_LB), ws('2026-08-26', TPL_UA), ws('2026-08-28', TPL_LA), ws('2026-08-29', TPL_UB), // week 2: 4
+      ws('2026-08-31', TPL_LB), // current week: 1 so far
+    ];
+    expect(foundationStreak({ plan, sessions, startDate: '2026-08-17' }, '2026-09-02')).toBe(2);
+    expect(foundationStreak({ plan, sessions: [...sessions, ws('2026-09-01', TPL_UA), ws('2026-09-02', TPL_LA)], startDate: '2026-08-17' }, '2026-09-02')).toBe(3);
+    // a week at 2 breaks it
+    const broken = sessions.filter((s) => s.date < '2026-08-21' || s.date >= '2026-08-24');
+    expect(foundationStreak({ plan, sessions: broken, startDate: '2026-08-17' }, '2026-09-02')).toBe(1);
+    // weeks before the start date are not judged
+    expect(foundationStreak({ plan, sessions, startDate: '2026-08-24' }, '2026-09-02')).toBe(1);
   });
 
-  it('shows what occurred: BOX, A, B, ACC and combinations', () => {
-    const ctx = { plan, sessions: [ws(TUE, BC_TPL_A), ws(TUE, BC_TPL_OPT, 20), ws(FRI, BC_TPL_B)], boxing: [box(TUE)] };
-    expect(dayRecord(TUE, ctx).tags).toEqual(['BOX', 'A', 'ACC']);
-    expect(dayRecord(FRI, ctx).tags).toEqual(['B']);
-    expect(sessionTag({ ...ws(SAT, 'tpl_custom'), name: 'PUSH DAY' }, plan)).toBe('PUS');
-  });
-});
-
-describe('weekly streaks', () => {
-  it('foundation streak counts consecutive weeks meeting minimums; current week never breaks it', () => {
-    const sessions = [ws('2026-08-19', BC_TPL_A), ws('2026-08-26', BC_TPL_B)];
-    const boxing = [box('2026-08-18'), box('2026-08-20'), box('2026-08-25'), box('2026-08-27')];
-    // weeks of Aug 17 and Aug 24 meet foundation; current week (Aug 31) empty so far
-    expect(foundationStreak({ plan, sessions, boxing, startDate: '2026-08-17' }, TUE)).toBe(2);
-    // current week met → 3
-    expect(foundationStreak({ plan, sessions: [...sessions, ws(MON, BC_TPL_A)], boxing: [...boxing, box(MON), box(TUE)], startDate: '2026-08-17' }, TUE)).toBe(3);
-    // a gap week breaks it
-    expect(foundationStreak({ plan, sessions: [ws('2026-08-12', BC_TPL_A), ws('2026-08-26', BC_TPL_B)], boxing: [box('2026-08-11'), box('2026-08-13'), box('2026-08-25'), box('2026-08-27')], startDate: '2026-08-10' }, TUE)).toBe(1);
+  it('targetWeeks counts complete previous weeks at the target', () => {
+    const sessions = [ws('2026-08-24', TPL_LB), ws('2026-08-26', TPL_UA), ws('2026-08-28', TPL_LA), ws('2026-08-29', TPL_UB)];
+    expect(targetWeeks({ plan, sessions, startDate: '2026-08-17' }, '2026-09-02')).toEqual({ hit: 1, of: 2 });
   });
 
-  it('target weeks counts full-target weeks among the previous 8', () => {
-    const sessions = [ws('2026-08-18', BC_TPL_A), ws('2026-08-21', BC_TPL_B)];
-    const boxing = [box('2026-08-17'), box('2026-08-19'), box('2026-08-22'), box('2026-08-23')];
-    const tw = targetWeeks({ plan, sessions, boxing, startDate: '2026-07-01' }, TUE);
-    expect(tw).toEqual({ hit: 1, of: 8 });
-    expect(targetWeeks({ plan, sessions, boxing, startDate: '2026-08-17' }, NEXT_MON).of).toBe(3);
+  it('dayRecord lists completed sessions on a date, oldest first', () => {
+    const a = ws('2026-09-01', TPL_UA);
+    const b = ws('2026-09-01', TPL_FLOW);
+    expect(dayRecord('2026-09-01', { sessions: [b, a, ws('2026-09-02', TPL_LA)] }).sessions.map((s) => s.id)).toEqual([a.id, b.id]);
+    expect(dayRecord('2026-09-03', { sessions: [a] }).sessions).toEqual([]);
   });
 });

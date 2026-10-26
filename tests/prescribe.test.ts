@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { fmtTargets, hitAllTargets, prescribeReps } from '../src/lib/prescribe';
 
-const last = (reps: (number | null)[], targetReps?: number[], repMin = 8) => ({
+const last = (reps: (number | null)[], targetReps?: number[], repMin = 8, deload?: boolean) => ({
   sets: reps.map((r) => ({ reps: r, weight: 0 })),
   targetSets: 3,
   targetReps,
   repMin,
+  ...(deload ? { deload: true } : {}),
 });
 
 describe('prescribeReps', () => {
@@ -28,12 +29,18 @@ describe('prescribeReps', () => {
 
   it('sessions without targets treat the floor as the target; incomplete sets use the last logged value', () => {
     expect(prescribeReps({ sets: 3, repMin: 8, repMax: 12, last: last([10, 10, 10]) })).toEqual([11, 11, 11]);
-    expect(prescribeReps({ sets: 3, repMin: 8, repMax: 12, last: last([10, 7, 7]) })).toEqual([10, 8, 8]); // below floor → floor, not all hit → +1 total
+    expect(prescribeReps({ sets: 3, repMin: 8, repMax: 12, last: last([10, 7, 7]) })).toEqual([10, 8, 8]);
     expect(prescribeReps({ sets: 3, repMin: 8, repMax: 12, last: last([9, null, null], [9, 9, 9]) })).toEqual([10, 10, 10]);
   });
 
   it('over-performing feeds the next target from what was actually done', () => {
     expect(prescribeReps({ sets: 3, repMin: 5, repMax: 8, last: last([8, 7, 6], [5, 5, 5], 5) })).toEqual([8, 8, 7]);
+  });
+
+  it('after a deload the climb restarts one step above the floor, whatever was done that day', () => {
+    expect(prescribeReps({ sets: 3, repMin: 5, repMax: 8, last: last([8, 8, 8], [5, 5, 5], 5, true) })).toEqual([6, 6, 6]);
+    expect(prescribeReps({ sets: 3, repMin: 5, repMax: 8, last: last([5, 5, 5], [5, 5, 5], 5, true) })).toEqual([6, 6, 6]);
+    expect(prescribeReps({ sets: 3, repMin: 15, repMax: 30, timed: true, last: last([15, 15, 15], [15, 15, 15], 15, true) })).toEqual([20, 20, 20]);
   });
 
   it('timed holds move in 5-second steps', () => {

@@ -15,9 +15,9 @@ export default defineConfig({
       manifest: {
         name: 'LIFTDECK',
         short_name: 'LIFTDECK',
-        description: 'Personal workout terminal: strength progression + boxing attendance.',
-        theme_color: '#05070d',
-        background_color: '#05070d',
+        description: 'Bodyweight strength on a pull-up bar: progression chains, exact targets, stall handling.',
+        theme_color: '#0d0f13',
+        background_color: '#0d0f13',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '.',

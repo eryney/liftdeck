@@ -1,37 +1,30 @@
 const p = {
   fill: 'none',
   stroke: 'currentColor',
-  strokeWidth: 1.8,
-  strokeLinecap: 'square' as const,
-  strokeLinejoin: 'miter' as const,
+  strokeWidth: 1.9,
+  strokeLinecap: 'round' as const,
+  strokeLinejoin: 'round' as const,
 };
 
 export const IconToday = () => (
   <svg viewBox="0 0 24 24" {...p}>
-    <rect x="4" y="5" width="16" height="15" />
-    <path d="M4 10h16M8 3v4M16 3v4" />
-    <rect x="10" y="13" width="4" height="4" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 7.5V12l3 2" />
   </svg>
 );
 
-export const IconCalendar = () => (
+export const IconChains = () => (
   <svg viewBox="0 0 24 24" {...p}>
-    <rect x="3" y="5" width="18" height="16" />
-    <path d="M3 10h18M8 3v4M16 3v4M7 14h2M11 14h2M15 14h2M7 17h2M11 17h2" />
+    <path d="M5 19h4M5 14h8M5 9h11M5 4h14" />
+    <path d="M19 15l-3 3 1.5 1.5L21 16" />
   </svg>
 );
 
-export const IconProgress = () => (
+export const IconHistory = () => (
   <svg viewBox="0 0 24 24" {...p}>
-    <path d="M4 20h17M4 20V4" />
-    <path d="M7 16l4-5 3 2 5-7" />
-  </svg>
-);
-
-export const IconPlan = () => (
-  <svg viewBox="0 0 24 24" {...p}>
-    <path d="M5 4h14v17H5z" />
-    <path d="M9 8h6M9 12h6M9 16h4" />
+    <rect x="3.5" y="5" width="17" height="15" rx="2" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+    <circle cx="12" cy="15" r="1.4" fill="currentColor" stroke="none" />
   </svg>
 );
 

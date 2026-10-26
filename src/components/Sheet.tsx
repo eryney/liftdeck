@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import type { ReactNode } from 'react';
 
-export function Sheet({ onClose, children }: { onClose: () => void; children: ReactNode }) {
+export function Sheet({ onClose, children, title }: { onClose: () => void; children: ReactNode; title?: string }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -12,7 +12,8 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
   return (
     <>
       <div className="sheet-backdrop" onClick={onClose} />
-      <div className="sheet" role="dialog" aria-modal="true">
+      <div className="sheet" role="dialog" aria-modal="true" aria-label={title}>
+        {title && <h3>{title}</h3>}
         {children}
       </div>
     </>
@@ -22,7 +23,7 @@ export function Sheet({ onClose, children }: { onClose: () => void; children: Re
 export function Confirm({
   title,
   body,
-  confirmLabel = 'CONFIRM',
+  confirmLabel = 'Confirm',
   danger,
   onConfirm,
   onCancel,
@@ -35,15 +36,13 @@ export function Confirm({
   onCancel: () => void;
 }) {
   return (
-    <Sheet onClose={onCancel}>
-      <div className="tiny faint">CONFIRM</div>
-      <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '0.06em', marginTop: 6 }}>{title}</div>
-      {body && <p className="dim small">{body}</p>}
-      <div className="row mt16" style={{ gap: 10 }}>
-        <button className="btn btn--ghost" style={{ flex: 1 }} onClick={onCancel}>
-          CANCEL
+    <Sheet onClose={onCancel} title={title}>
+      {body && <p className="muted small" style={{ margin: '8px 0 0' }}>{body}</p>}
+      <div className="row mt16">
+        <button className="btn btn--ghost grow" onClick={onCancel}>
+          Cancel
         </button>
-        <button className={`btn ${danger ? 'btn--danger' : ''}`} style={{ flex: 1 }} onClick={onConfirm}>
+        <button className={`btn grow ${danger ? 'btn--danger' : ''}`} onClick={onConfirm}>
           {confirmLabel}
         </button>
       </div>

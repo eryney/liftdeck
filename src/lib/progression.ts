@@ -29,6 +29,8 @@ export function isComplete(es: ExerciseSession): boolean {
 /** Increase criterion on prescribed sets only. */
 export function assess(es: ExerciseSession): Assessment {
   if (!isComplete(es)) return 'incomplete';
+  // a deload is a deliberate easy session: it can never advance the chain
+  if (es.deload) return 'hold';
   return prescribedSets(es).every((s) => (s.reps ?? 0) >= es.repMax) ? 'increase' : 'hold';
 }
 
@@ -51,6 +53,7 @@ export function belowRange(es: ExerciseSession): boolean {
 export function assessWithHistory(es: ExerciseSession, prior: ExerciseSession | null): ExerciseResult {
   const a = assess(es);
   if (a !== 'hold') return a;
+  if (es.deload) return 'hold';
   if (belowRange(es) && prior && prior.weight === es.weight && belowRange(prior)) return 'reduce';
   return 'hold';
 }
@@ -118,14 +121,14 @@ export function resultLabel(r: ExerciseResult | undefined, chain = false): { tex
   switch (r) {
     case 'increase':
     case 'progress':
-      return { text: chain ? 'ADVANCE' : 'INCREASE', glyph: '▲', cls: 'green' };
+      return { text: chain ? 'Advance' : 'Increase', glyph: '▲', cls: 'green' };
     case 'reduce':
-      return { text: chain ? 'STEP BACK' : 'REDUCE', glyph: '↓', cls: 'amber' };
+      return { text: chain ? 'Step back' : 'Reduce', glyph: '↓', cls: 'amber' };
     case 'incomplete':
-      return { text: 'INCOMPLETE', glyph: '·', cls: 'faint' };
+      return { text: 'Incomplete', glyph: '·', cls: 'faint' };
     case 'hold':
     case 'keep':
-      return { text: 'HOLD', glyph: '=', cls: 'dim' };
+      return { text: 'Hold', glyph: '=', cls: 'muted' };
     default:
       return { text: '', glyph: '', cls: 'faint' };
   }
@@ -162,8 +165,10 @@ export interface ExposureRow {
   prescribedReps: number[];
   volume: number;
   result?: ExerciseResult;
-  finalSetRir?: number;
   bodyweight?: boolean;
+  deload?: boolean;
+  level?: number;
+  targetReps?: number[];
 }
 
 /** Per-session history for one exercise, oldest first */
@@ -184,8 +189,10 @@ export function exerciseHistory(sessions: WorkoutSession[], exerciseId: string):
             prescribedReps: prescribedSets(es).filter((x) => x.reps != null).map((x) => x.reps as number),
             volume: logged.reduce((sum, x) => sum + (x.reps as number) * x.weight, 0),
             result: es.result,
-            finalSetRir: es.finalSetRir,
             bodyweight: es.bodyweight,
+            ...(es.deload ? { deload: true } : {}),
+            ...(es.level != null ? { level: es.level } : {}),
+            ...(es.targetReps ? { targetReps: es.targetReps } : {}),
           };
         }),
     );

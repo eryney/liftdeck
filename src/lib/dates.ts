@@ -36,14 +36,18 @@ export function weekStart(iso: string): string {
   return addDays(iso, -weekdayIndex(iso));
 }
 
+const title = (s: string) => s.charAt(0) + s.slice(1).toLowerCase();
+
+/** "Sep 1" */
 export function formatShort(iso: string): string {
   const d = parseISO(iso);
-  return `${MONTH_NAMES[d.getMonth()]} ${d.getDate()}`;
+  return `${title(MONTH_NAMES[d.getMonth()])} ${d.getDate()}`;
 }
 
+/** "Tuesday · Sep 1 2026" */
 export function formatLong(iso: string): string {
   const d = parseISO(iso);
-  return `${WEEKDAY_NAMES[weekdayIndex(iso)]} · ${MONTH_NAMES[d.getMonth()]} ${d.getDate()} ${d.getFullYear()}`;
+  return `${title(WEEKDAY_NAMES[weekdayIndex(iso)])} · ${title(MONTH_NAMES[d.getMonth()])} ${d.getDate()} ${d.getFullYear()}`;
 }
 
 export function daysBetween(a: string, b: string): number {

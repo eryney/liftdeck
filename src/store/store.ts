@@ -1,23 +1,18 @@
 import { useSyncExternalStore } from 'react';
 import type {
-  AppSettings, BodyMeasurement, BoxingAttendance, DayActivity, Exercise,
+  AppSettings, BodyMeasurement, Exercise,
   ExerciseSession, TemplateExercise, WorkoutPlan, WorkoutSession, WorkoutTemplate,
 } from '../types';
 import { bulkPut, clearAllStores, defaultSettings, del, loadAll, put } from '../lib/db';
 import type { DBShape } from '../lib/db';
-import { EXERCISE_LIBRARY } from '../data/exercises';
-import {
-  BOXER_CUT_GOAL_DATE, BOXER_CUT_PLAN, BOXER_CUT_PLAN_ID, BOXER_CUT_SEED_MARKER, BOXER_CUT_TEMPLATES, isUntouchedLegacySeed,
-  CALI_GOAL_DATE, CALI_PLAN, CALI_PLAN_ID, CALI_SEED_MARKER, CALI_TEMPLATES, isUntouchedBoxerCutSeed,
-} from '../data/seedPlan';
+import { EXERCISE_LIBRARY, LIBRARY_IDS } from '../data/exercises';
+import { LEGACY_PLAN_IDS, LEGACY_TEMPLATE_IDS, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES } from '../data/seedPlan';
 import { newId } from '../lib/ids';
-import { todayISO, weekdayIndex } from '../lib/dates';
+import { todayISO } from '../lib/dates';
 import { computeResult, lastPerformance, suggestWeight } from '../lib/progression';
 import { adjacentVariation, resolveVariation } from '../lib/variation';
 import { prescribeReps } from '../lib/prescribe';
-import { isFixedPlan, isFlexPlan } from '../lib/flex';
-import { migrateSettings } from '../lib/migrate';
-import type { ResolvedBundle } from '../lib/planBundle';
+import { migrateSettings, normalizePlans } from '../lib/migrate';
 import type { BackupFile } from '../types';
 import { SCHEMA_VERSION } from '../types';
 
@@ -34,7 +29,6 @@ export interface AppState {
   templates: WorkoutTemplate[];
   plans: WorkoutPlan[];
   sessions: WorkoutSession[];
-  boxing: BoxingAttendance[];
   measurements: BodyMeasurement[];
   restTimer: RestTimer | null;
 }
@@ -51,7 +45,6 @@ export class Store {
     templates: [],
     plans: [],
     sessions: [],
-    boxing: [],
     measurements: [],
     restTimer: null,
   };
@@ -89,88 +82,65 @@ export class Store {
       settings: data.settings ?? defaultSettings(),
       exercises: data.exercises,
       templates: data.templates,
-      plans: data.plans,
+      plans: normalizePlans(data.plans),
       sessions: data.sessions.sort((a, b) => a.startedAt - b.startedAt),
-      boxing: data.boxing,
       measurements: data.measurements,
     });
   }
 
-  /** Fresh install: library + CALISTHENICS CUT // FLEX as the default plan. */
+  /** Fresh install: library + the bundled program as the active plan. */
   private async seed(): Promise<void> {
     await bulkPut('exercises', EXERCISE_LIBRARY);
-    await bulkPut('templates', CALI_TEMPLATES);
-    await put('plans', CALI_PLAN);
-    await put('settings', {
-      ...defaultSettings(),
-      goalMode: 'cut',
-      goalDate: CALI_GOAL_DATE,
-      // both markers: a fresh install never gets the older BOXER CUT seed added later
-      seedMarkers: [BOXER_CUT_SEED_MARKER, CALI_SEED_MARKER],
-    } satisfies AppSettings);
+    await bulkPut('templates', SEED_TEMPLATES);
+    await put('plans', SEED_PLAN);
+    await put('settings', { ...defaultSettings(), seedMarkers: [SEED_MARKER] } satisfies AppSettings);
   }
 
   /**
-   * Existing install. Nothing is deleted or rewritten:
-   * - settings gain current defaults (schemaVersion 3)
-   * - library exercises missing from the device are added; existing ones are untouched EXCEPT that
-   *   v1 bodyweight exercises gain their progression-chain tags (progressionId/level/cue) if they lack them
-   * - BOXER CUT // FLEX (v2) and CALISTHENICS CUT // FLEX (v3) templates + plan are added exactly once each
-   * - the newest bundled plan becomes active only if the active plan is still an untouched default seed
+   * Existing install (any earlier version). History is never rewritten.
+   * - settings gain current defaults (schemaVersion 4)
+   * - the exercise library is resynced: library rows are refreshed (chain order, cues), custom rows are
+   *   untouched, retired library rows (gym equipment, dropped rungs) are removed; sessions keep their names
+   * - the bundled program is added once; legacy default plans/templates are removed and the program becomes
+   *   active if the active plan was one of them (or missing)
    */
   private async migrateExisting(data: DBShape): Promise<void> {
     const settings = migrateSettings(data.settings);
     const markers = new Set(settings.seedMarkers ?? []);
     const before = JSON.stringify(data.settings);
 
+    // library resync
     const haveEx = new Map(data.exercises.map((e) => [e.id, e]));
-    const missingEx = EXERCISE_LIBRARY.filter((e) => !haveEx.has(e.id));
-    if (missingEx.length > 0) await bulkPut('exercises', missingEx);
-    // chain tags on pre-existing library rows (never touches custom exercises or user edits to name/category)
-    const retagged: Exercise[] = [];
+    const refreshed: Exercise[] = [];
     for (const lib of EXERCISE_LIBRARY) {
       const cur = haveEx.get(lib.id);
-      if (!cur || cur.custom || !lib.progressionId || cur.progressionId) continue;
-      retagged.push({ ...cur, progressionId: lib.progressionId, level: lib.level, bodyweight: true, ...(lib.cue ? { cue: lib.cue } : {}), ...(lib.gear ? { gear: lib.gear } : {}), ...(lib.timed ? { timed: true } : {}) });
+      if (!cur || JSON.stringify(cur) !== JSON.stringify(lib)) refreshed.push(lib);
     }
-    if (retagged.length > 0) await bulkPut('exercises', retagged);
-
-    if (!markers.has(BOXER_CUT_SEED_MARKER)) {
-      const haveTpl = new Set(data.templates.map((t) => t.id));
-      const newTpls = BOXER_CUT_TEMPLATES.filter((t) => !haveTpl.has(t.id));
-      if (newTpls.length > 0) await bulkPut('templates', newTpls);
-      if (!data.plans.some((p) => p.id === BOXER_CUT_PLAN_ID)) await put('plans', BOXER_CUT_PLAN);
-      markers.add(BOXER_CUT_SEED_MARKER);
-      settings.seedMarkers = [...markers];
-
-      const active = data.plans.find((p) => p.id === settings.activePlanId) ?? null;
-      const shouldActivate = settings.activePlanId == null ? !settings.onboarded : isUntouchedLegacySeed(active);
-      if (shouldActivate) {
-        settings.activePlanId = BOXER_CUT_PLAN_ID;
-        if (settings.goalMode == null) {
-          settings.goalMode = 'cut';
-          settings.goalDate = settings.goalDate ?? BOXER_CUT_GOAL_DATE;
-        }
-      }
+    if (refreshed.length > 0) await bulkPut('exercises', refreshed);
+    for (const cur of data.exercises) {
+      if (!cur.custom && !LIBRARY_IDS.has(cur.id)) await del('exercises', cur.id);
     }
 
-    if (!markers.has(CALI_SEED_MARKER)) {
-      const haveTpl = new Set(data.templates.map((t) => t.id));
-      const newTpls = CALI_TEMPLATES.filter((t) => !haveTpl.has(t.id));
-      if (newTpls.length > 0) await bulkPut('templates', newTpls);
-      if (!data.plans.some((p) => p.id === CALI_PLAN_ID)) await put('plans', CALI_PLAN);
-      markers.add(CALI_SEED_MARKER);
-      settings.seedMarkers = [...markers];
+    // plans: drop anything that is not a weekly-goal plan (fixed weekday plans from v1)
+    const plans = normalizePlans(data.plans);
+    for (const p of data.plans as Array<{ id: string }>) {
+      if (!plans.some((q) => q.id === p.id)) await del('plans', p.id);
+    }
 
-      // the plan that is active right now, including one the BOXER CUT block just activated above
-      const activeId = settings.activePlanId;
-      const active = data.plans.find((p) => p.id === activeId) ?? (activeId === BOXER_CUT_PLAN_ID ? BOXER_CUT_PLAN : null);
-      const shouldActivate = activeId == null ? !settings.onboarded : isUntouchedBoxerCutSeed(active) || isUntouchedLegacySeed(active);
-      if (shouldActivate) {
-        settings.activePlanId = CALI_PLAN_ID;
-        if (settings.goalMode == null) settings.goalMode = 'cut';
-        if (settings.goalDate == null || settings.goalDate === BOXER_CUT_GOAL_DATE) settings.goalDate = CALI_GOAL_DATE;
-      }
+    if (!markers.has(SEED_MARKER)) {
+      const haveTpl = new Set(data.templates.map((t) => t.id));
+      const newTpls = SEED_TEMPLATES.filter((t) => !haveTpl.has(t.id));
+      if (newTpls.length > 0) await bulkPut('templates', newTpls);
+      if (!plans.some((p) => p.id === PLAN_ID)) await put('plans', SEED_PLAN);
+
+      const activeWasLegacy = settings.activePlanId == null || LEGACY_PLAN_IDS.includes(settings.activePlanId) || !plans.some((p) => p.id === settings.activePlanId);
+      for (const id of LEGACY_PLAN_IDS) if (plans.some((p) => p.id === id) || (data.plans as Array<{ id: string }>).some((p) => p.id === id)) await del('plans', id);
+      for (const id of LEGACY_TEMPLATE_IDS) if (haveTpl.has(id)) await del('templates', id);
+      if (activeWasLegacy) settings.activePlanId = PLAN_ID;
+      markers.add(SEED_MARKER);
+      settings.seedMarkers = [...markers];
+    } else if (settings.activePlanId == null || !plans.some((p) => p.id === settings.activePlanId)) {
+      settings.activePlanId = plans.some((p) => p.id === PLAN_ID) ? PLAN_ID : plans[0]?.id ?? null;
     }
     if (JSON.stringify(settings) !== before) await put('settings', settings);
   }
@@ -191,12 +161,6 @@ export class Store {
 
   activePlan(): WorkoutPlan | null {
     return this.state.plans.find((p) => p.id === this.state.settings.activePlanId) ?? null;
-  }
-
-  /** Fixed plans only; flex plans have no weekday activities. */
-  activityFor(date: string): DayActivity {
-    const plan = this.activePlan();
-    return plan && isFixedPlan(plan) ? plan.schedule[weekdayIndex(date)] : { type: 'rest' };
   }
 
   activeSession(): WorkoutSession | null {
@@ -240,15 +204,13 @@ export class Store {
       targetReps,
       exerciseId,
       name: ex?.name ?? exerciseId,
-      perHand: ex?.perHand,
       perSide: ex?.perSide,
-      bodyweight: ex?.bodyweight,
+      bodyweight: true,
       targetSets: tpl.sets,
       repMin: tpl.repMin,
       repMax: tpl.repMax,
       restSec: tpl.restSec,
       increment: tpl.increment,
-      ...(tpl.targetRir != null ? { targetRir: tpl.targetRir } : {}),
       suggestedWeight: weight,
       weight,
       sets: Array.from({ length: tpl.sets }, () => ({ reps: null, weight })),
@@ -365,22 +327,35 @@ export class Store {
     });
   }
 
-  /** Change working weight; applies to unlogged sets. What was already lifted is never rewritten. */
+  /** Change added load; applies to unlogged sets. What was already lifted is never rewritten. */
   setExerciseWeight(sessionId: string, esId: string, weight: number): void {
-    this.updateExerciseSession(sessionId, esId, (es) => ({
-      ...es,
-      weight,
-      targetReps: this.targetsFor(es.exerciseId, es.targetSets, es.repMin, es.repMax, !!es.timed, weight),
-      sets: es.sets.map((set) => (set.reps == null ? { ...set, weight } : set)),
-    }));
+    this.updateExerciseSession(sessionId, esId, (es) => {
+      const next: ExerciseSession = {
+        ...es,
+        weight,
+        targetReps: this.targetsFor(es.exerciseId, es.targetSets, es.repMin, es.repMax, !!es.timed, weight),
+        sets: es.sets.map((set) => (set.reps == null ? { ...set, weight } : set)),
+      };
+      delete next.deload;
+      return next;
+    });
   }
 
-  /** Optional one-tap RIR after the final prescribed set. Telemetry only. */
-  setFinalRir(sessionId: string, esId: string, rir: number | undefined): void {
+  /**
+   * Deload this exposure: every target drops to the floor of the range for this one session, and the
+   * exposure is marked so it can never ADVANCE the chain and so stall detection restarts after it.
+   * Turning it off restores the ordinary targets. Only meaningful before the first set.
+   */
+  setDeload(sessionId: string, esId: string, on: boolean): void {
     this.updateExerciseSession(sessionId, esId, (es) => {
-      const next = { ...es };
-      if (rir == null) delete next.finalSetRir;
-      else next.finalSetRir = rir;
+      const next: ExerciseSession = { ...es };
+      if (on) {
+        next.deload = true;
+        next.targetReps = Array.from({ length: es.targetSets }, () => es.repMin);
+      } else {
+        delete next.deload;
+        next.targetReps = this.targetsFor(es.exerciseId, es.targetSets, es.repMin, es.repMax, !!es.timed, es.weight);
+      }
       return next;
     });
   }
@@ -413,15 +388,14 @@ export class Store {
         ...es,
         exerciseId: newExerciseId,
         name: ex.name,
-        perHand: ex.perHand,
         perSide: ex.perSide,
-        bodyweight: ex.bodyweight,
+        bodyweight: true,
         substitutedFor: es.substitutedFor ?? es.name,
         suggestedWeight: weight,
         weight,
         sets: es.sets.map((set) => (set.reps == null ? { ...set, weight } : set)),
       };
-      for (const k of ['timed', 'cue', 'gear', 'progressionId', 'level', 'levelCount', 'variationBasis', 'fromExerciseId', 'fromName'] as const) delete next[k];
+      for (const k of ['timed', 'cue', 'gear', 'progressionId', 'level', 'levelCount', 'variationBasis', 'fromExerciseId', 'fromName', 'deload'] as const) delete next[k];
       next.targetReps = this.targetsFor(newExerciseId, es.targetSets, es.repMin, es.repMax, !!ex.timed, weight);
       if (ex.timed) next.timed = true;
       if (ex.cue) next.cue = ex.cue;
@@ -450,8 +424,8 @@ export class Store {
   }
 
   /**
-   * Step one rung up or down the exercise's progression chain for THIS session. The substitute's own
-   * history drives its added-load suggestion; the chain picks up from whatever is actually performed.
+   * Step one rung up or down the exercise's progression chain for THIS session. The new rung's own
+   * history drives its targets; the chain picks up from whatever is actually performed.
    */
   shiftVariation(sessionId: string, esId: string, dir: -1 | 1): void {
     const session = this.state.sessions.find((s) => s.id === sessionId);
@@ -466,9 +440,8 @@ export class Store {
         ...cur,
         exerciseId: target.id,
         name: target.name,
-        perHand: target.perHand,
         perSide: target.perSide,
-        bodyweight: target.bodyweight,
+        bodyweight: true,
         suggestedWeight: weight,
         weight,
         sets: cur.sets.map((set) => (set.reps == null ? { ...set, weight } : set)),
@@ -481,6 +454,7 @@ export class Store {
       delete next.fromExerciseId;
       delete next.fromName;
       delete next.substitutedFor;
+      delete next.deload;
       if (target.timed) next.timed = true; else delete next.timed;
       if (target.cue) next.cue = target.cue; else delete next.cue;
       if (target.gear) next.gear = target.gear; else delete next.gear;
@@ -528,40 +502,6 @@ export class Store {
     if (this.state.restTimer) this.set({ restTimer: null });
   }
 
-  // ── boxing ────────────────────────────────────────────
-
-  /** One tap. Returns the record (existing one if that date is already logged). Details are optional and can be added later. */
-  logBoxing(date = todayISO(), details: Partial<Pick<BoxingAttendance, 'durationMin' | 'rpe' | 'sessionType'>> = {}): BoxingAttendance {
-    const existing = this.state.boxing.find((b) => b.date === date);
-    if (existing) return existing;
-    const rec: BoxingAttendance = { id: newId('bx'), date, loggedAt: Date.now(), ...stripUndefined(details) };
-    this.set({ boxing: [...this.state.boxing, rec] });
-    put('boxing', rec).catch(persistErr);
-    return rec;
-  }
-
-  /** Add/change optional metadata on an existing boxing record. Passing undefined clears a field. */
-  updateBoxing(id: string, patch: Partial<Pick<BoxingAttendance, 'durationMin' | 'rpe' | 'sessionType'>>): void {
-    const cur = this.state.boxing.find((b) => b.id === id);
-    if (!cur) return;
-    const next: BoxingAttendance = { ...cur };
-    for (const k of ['durationMin', 'rpe', 'sessionType'] as const) {
-      if (!(k in patch)) continue;
-      const v = patch[k];
-      if (v == null) delete next[k];
-      else (next as any)[k] = v;
-    }
-    this.set({ boxing: this.state.boxing.map((b) => (b.id === id ? next : b)) });
-    put('boxing', next).catch(persistErr);
-  }
-
-  undoBoxing(date: string): void {
-    const rec = this.state.boxing.find((b) => b.date === date);
-    if (!rec) return;
-    this.set({ boxing: this.state.boxing.filter((b) => b.id !== rec.id) });
-    del('boxing', rec.id).catch(persistErr);
-  }
-
   // ── body measurements ─────────────────────────────────
 
   addMeasurement(date: string, weightLb: number, waistIn?: number): void {
@@ -600,26 +540,17 @@ export class Store {
   deleteTemplate(id: string): void {
     this.set({ templates: this.state.templates.filter((t) => t.id !== id) });
     for (const plan of this.state.plans) {
-      if (isFlexPlan(plan)) {
-        const uses = plan.weeklyGoals.some(
-          (g) => (g.kind === 'rotation' && g.templateIds.includes(id)) || (g.kind === 'workout' && g.templateId === id),
-        );
-        if (!uses) continue;
-        this.savePlan({
-          ...plan,
-          weeklyGoals: plan.weeklyGoals
-            .map((g) => (g.kind === 'rotation' ? { ...g, templateIds: g.templateIds.filter((t) => t !== id) } : g))
-            .filter((g) => !(g.kind === 'workout' && g.templateId === id))
-            .filter((g) => !(g.kind === 'rotation' && g.templateIds.length === 0)),
-        });
-      } else if (plan.schedule.some((d) => d.type === 'workout' && d.templateId === id)) {
-        this.savePlan({
-          ...plan,
-          schedule: plan.schedule.map((d) =>
-            d.type === 'workout' && d.templateId === id ? { type: 'rest' } : d,
-          ),
-        });
-      }
+      const uses = plan.weeklyGoals.some(
+        (g) => (g.kind === 'rotation' && g.templateIds.includes(id)) || (g.kind === 'workout' && g.templateId === id),
+      );
+      if (!uses) continue;
+      this.savePlan({
+        ...plan,
+        weeklyGoals: plan.weeklyGoals
+          .map((g) => (g.kind === 'rotation' ? { ...g, templateIds: g.templateIds.filter((t) => t !== id) } : g))
+          .filter((g) => !(g.kind === 'workout' && g.templateId === id))
+          .filter((g) => !(g.kind === 'rotation' && g.templateIds.length === 0)),
+      });
     }
     del('templates', id).catch(persistErr);
   }
@@ -640,17 +571,11 @@ export class Store {
     if (this.state.settings.activePlanId === id) this.updateSettings({ activePlanId: null });
   }
 
-  /** Add a resolved plan bundle. Adds only; history, boxing, measurements and settings are untouched. */
-  async importPlanBundle(resolved: ResolvedBundle): Promise<string> {
-    if (resolved.exercises.length) await bulkPut('exercises', resolved.exercises);
-    if (resolved.templates.length) await bulkPut('templates', resolved.templates);
-    await put('plans', resolved.plan);
-    this.set({
-      exercises: [...this.state.exercises, ...resolved.exercises],
-      templates: [...this.state.templates, ...resolved.templates],
-      plans: [...this.state.plans, resolved.plan],
-    });
-    return resolved.plan.id;
+  /** Put the bundled program back exactly as shipped (templates + weekly goals). History is untouched. */
+  restoreDefaultProgram(): void {
+    for (const t of SEED_TEMPLATES) this.saveTemplate(t);
+    this.savePlan(SEED_PLAN);
+    if (this.state.settings.activePlanId !== PLAN_ID) this.updateSettings({ activePlanId: PLAN_ID });
   }
 
   // ── exercise library ──────────────────────────────────
@@ -682,7 +607,6 @@ export class Store {
       templates: s.templates,
       plans: s.plans,
       sessions: s.sessions,
-      boxing: s.boxing,
       measurements: s.measurements,
     };
   }
@@ -694,10 +618,9 @@ export class Store {
     await bulkPut('templates', backup.templates);
     await bulkPut('plans', backup.plans);
     await bulkPut('sessions', backup.sessions);
-    await bulkPut('boxing', backup.boxing);
     await bulkPut('measurements', backup.measurements);
     await put('settings', { ...backup.settings, id: 'settings', schemaVersion: SCHEMA_VERSION });
-    // a restored v1 backup gets the same one-time additions an upgraded install gets
+    // a restored older backup gets the same one-time additions an upgraded install gets
     await this.migrateExisting(await loadAll());
     this.hydrate(await loadAll());
   }
@@ -709,12 +632,6 @@ export class Store {
     this.set({ restTimer: null });
     this.hydrate(await loadAll());
   }
-}
-
-function stripUndefined<T extends object>(o: T): T {
-  const out = { ...o } as Record<string, unknown>;
-  for (const k of Object.keys(out)) if (out[k] === undefined) delete out[k];
-  return out as T;
 }
 
 export const store = new Store();

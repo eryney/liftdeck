@@ -1,20 +1,16 @@
 export interface WeightCtx {
   weight: number;
   bodyweight?: boolean;
-  perHand?: boolean;
 }
 
-/** Short weight label: "45", "BW", "BW+10" */
+/** Short load label: "BW" or "BW+10" */
 export function fmtWeightShort(w: WeightCtx): string {
-  if (w.bodyweight) return w.weight > 0 ? `BW+${trim(w.weight)}` : 'BW';
-  return trim(w.weight);
+  return w.weight > 0 ? `BW+${trim(w.weight)}` : 'BW';
 }
 
-/** Full label with unit + qualifier: "45 LB / HAND", "BW + 10 LB" */
+/** Full label with unit: "Bodyweight" or "Bodyweight + 10 lb" */
 export function fmtWeightFull(w: WeightCtx, unit: string): string {
-  const u = unit.toUpperCase();
-  if (w.bodyweight) return w.weight > 0 ? `BW + ${trim(w.weight)} ${u}` : 'BODYWEIGHT';
-  return `${trim(w.weight)} ${u}${w.perHand ? ' / HAND' : ''}`;
+  return w.weight > 0 ? `Bodyweight + ${trim(w.weight)} ${unit}` : 'Bodyweight';
 }
 
 function trim(n: number): string {

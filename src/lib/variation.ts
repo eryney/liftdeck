@@ -105,17 +105,17 @@ export function adjacentVariation(exercises: Exercise[], exerciseId: string, dir
 export function basisText(c: Pick<ExerciseSession, 'variationBasis' | 'fromName' | 'level' | 'levelCount'>): { text: string; cls: string } | null {
   switch (c.variationBasis) {
     case 'advance':
-      return { text: `▲ ADVANCE${c.fromName ? ` from ${c.fromName}` : ''} · rep ceiling hit last time`, cls: 'green' };
+      return { text: `New rung${c.fromName ? ` · you hit every target on ${c.fromName}` : ''}`, cls: 'green' };
     case 'regress':
-      return { text: `↓ STEP BACK${c.fromName ? ` from ${c.fromName}` : ''} · two sessions below range · your call`, cls: 'amber' };
+      return { text: `Easier rung suggested${c.fromName ? ` · two sessions under the range on ${c.fromName}` : ''} · your call`, cls: 'amber' };
     case 'top':
-      return { text: '▲ TOP OF CHAIN · ceiling hit · add load, a pause, or a slower eccentric', cls: 'green' };
+      return { text: 'Top of the chain · add load, a pause, or a slower lowering', cls: 'green' };
     case 'hold':
-      return { text: '= HOLD · same variation · chase the rep ceiling', cls: 'dim' };
+      return { text: 'Same rung · one more rep than last time', cls: 'muted' };
     case 'start':
-      return { text: 'STARTING RUNG · step up or down if this is wrong for you', cls: 'faint' };
+      return { text: 'Starting rung · step up or down if this is wrong for you', cls: 'faint' };
     case 'manual':
-      return { text: 'MANUAL · you picked this rung today', cls: 'purple' };
+      return { text: 'You picked this rung today', cls: 'accent' };
     default:
       return null;
   }
@@ -124,22 +124,23 @@ export function basisText(c: Pick<ExerciseSession, 'variationBasis' | 'fromName'
 /** Result label text for an exercise that progresses by variation rather than load. */
 export function chainResultText(
   result: ExerciseSession['result'],
-  es: Pick<ExerciseSession, 'level' | 'levelCount'>,
+  es: Pick<ExerciseSession, 'level' | 'levelCount' | 'deload'>,
 ): { text: string; glyph: string; cls: string; detail: string } {
   const atTop = es.level != null && es.levelCount != null && es.level >= es.levelCount - 1;
+  if (es.deload) return { text: 'Deload', glyph: '↺', cls: 'accent', detail: 'targets restart just above the floor' };
   switch (result) {
     case 'increase':
     case 'progress':
       return atTop
-        ? { text: 'TOP OF CHAIN', glyph: '▲', cls: 'green', detail: 'add load / pause / slower eccentric' }
-        : { text: 'ADVANCE', glyph: '▲', cls: 'green', detail: 'next variation next time' };
+        ? { text: 'Top of chain', glyph: '▲', cls: 'green', detail: 'add load, a pause, or a slower lowering' }
+        : { text: 'Advance', glyph: '▲', cls: 'green', detail: 'next variation next time' };
     case 'reduce':
-      return { text: 'STEP BACK', glyph: '↓', cls: 'amber', detail: 'easier variation suggested' };
+      return { text: 'Step back', glyph: '↓', cls: 'amber', detail: 'easier variation suggested' };
     case 'incomplete':
-      return { text: 'INCOMPLETE', glyph: '·', cls: 'faint', detail: 'no decision' };
+      return { text: 'Incomplete', glyph: '·', cls: 'faint', detail: 'no decision' };
     case 'hold':
     case 'keep':
-      return { text: 'HOLD', glyph: '=', cls: 'dim', detail: 'same variation · add reps' };
+      return { text: 'Hold', glyph: '=', cls: 'muted', detail: 'same variation · add reps' };
     default:
       return { text: '', glyph: '', cls: 'faint', detail: '' };
   }

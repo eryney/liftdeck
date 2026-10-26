@@ -9,7 +9,6 @@ function es(over: Partial<ExerciseSession>): ExerciseSession {
     id: 'es1',
     exerciseId: 'db-bench-press',
     name: 'DB Bench',
-    perHand: true,
     targetSets: 3,
     repMin: 6,
     repMax: 10,
@@ -181,10 +180,10 @@ describe('RIR is optional telemetry', () => {
 
 describe('labels', () => {
   it('maps v1 results to v2 language', () => {
-    expect(resultLabel('progress').text).toBe('INCREASE');
-    expect(resultLabel('keep').text).toBe('HOLD');
+    expect(resultLabel('progress').text).toBe('Increase');
+    expect(resultLabel('keep').text).toBe('Hold');
     expect(resultLabel('reduce').cls).toBe('amber'); // never red
-    expect(resultLabel('hold').text).toBe('HOLD');
+    expect(resultLabel('hold').text).toBe('Hold');
     expect(resultLabel(undefined).text).toBe('');
   });
 });

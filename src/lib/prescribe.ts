@@ -15,7 +15,8 @@ import { prescribedSets } from './progression';
  * Every set is clamped into [repMin, repMax]; a set that fell below the floor is prescribed the
  * floor again. When every set is at the ceiling, the double-progression verdict already said
  * INCREASE / ADVANCE, so a new rung (or a new load) starts back at the floor.
- * Timed holds use the same rules in 5-second steps.
+ * Timed holds use the same rules in 5-second steps. After a deload session the targets restart at
+ * floor + 1 (or + 5 s), regardless of what was done on the deload day.
  */
 
 export function repStep(timed?: boolean): number {
@@ -28,13 +29,15 @@ export interface PrescribeInput {
   repMax: number;
   timed?: boolean;
   /** last completed exposure on THIS rung and load, if any */
-  last?: Pick<ExerciseSession, 'sets' | 'targetSets' | 'targetReps' | 'repMin'> | null;
+  last?: Pick<ExerciseSession, 'sets' | 'targetSets' | 'targetReps' | 'repMin' | 'deload'> | null;
 }
 
 export function prescribeReps({ sets, repMin, repMax, timed, last }: PrescribeInput): number[] {
   const step = repStep(timed);
   const clamp = (n: number) => Math.min(repMax, Math.max(repMin, n));
   if (!last) return Array.from({ length: sets }, () => repMin);
+  // after a deload the climb restarts one step above the floor, whatever was actually done that day
+  if (last.deload) return Array.from({ length: sets }, () => clamp(repMin + step));
   const done = prescribedSets(last as ExerciseSession)
     .map((s) => s.reps)
     .filter((r): r is number => r != null);

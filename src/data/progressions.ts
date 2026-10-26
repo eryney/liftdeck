@@ -2,11 +2,10 @@ import type { Exercise } from '../types';
 
 /**
  * Progression chains: ordered ladders of bodyweight variations for one movement pattern.
- * The exercises themselves carry `progressionId` + `level`; this file names the chains and
- * says which muscles they are for. A chain is the unit of progressive overload for bodyweight
- * training: when the rep ceiling is hit on every prescribed set, the next session moves one
- * rung up. When the top rung is reached, overload comes from added load (a loaded backpack),
- * pauses, or slower eccentrics.
+ * The exercises carry `progressionId` + `level`; this file names the chains and says what they
+ * train. A chain is the unit of progressive overload for bodyweight training: when the rep ceiling
+ * is hit on every prescribed set, the next session moves one rung up. At the top rung, overload
+ * comes from added load (a loaded backpack), pauses, or slower eccentrics.
  */
 export interface Progression {
   id: string;
@@ -17,25 +16,29 @@ export interface Progression {
   muscles: string;
   /** what to do once the last rung is at the rep ceiling */
   topNote: string;
+  /** chains that need a bar you can get above (not a doorway bar) */
+  needsClearance?: boolean;
 }
 
 export const PROGRESSIONS: Progression[] = [
-  { id: 'push', name: 'PUSH-UP CHAIN', pattern: 'HORIZONTAL PUSH', muscles: 'chest · front delts · triceps', topNote: 'Add a loaded backpack, a 2-s pause at the bottom, or a deficit (hands on books).' },
-  { id: 'vpush', name: 'HANDSTAND CHAIN', pattern: 'VERTICAL PUSH', muscles: 'shoulders · triceps · upper chest', topNote: 'Deficit HSPU (hands on books) or a 2-s pause at the bottom.' },
-  { id: 'dip', name: 'DIP CHAIN', pattern: 'DIP', muscles: 'chest · triceps · front delts', topNote: 'Add a loaded backpack or slow the eccentric to 4 s.' },
-  { id: 'pull', name: 'PULL-UP CHAIN', pattern: 'VERTICAL PULL', muscles: 'lats · upper back · biceps · grip', topNote: 'Weighted pull-ups with a loaded backpack; or start one-arm negatives.' },
-  { id: 'chin', name: 'CHIN-UP CHAIN', pattern: 'VERTICAL PULL · SUPINATED', muscles: 'lats · biceps · forearms', topNote: 'Weighted chin-ups with a loaded backpack.' },
-  { id: 'row', name: 'ROW CHAIN', pattern: 'HORIZONTAL PULL', muscles: 'mid-back · rear delts · biceps', topNote: 'Add a backpack on the chest, a 2-s pause, or swap to rings when you get them.' },
-  { id: 'tri', name: 'TRICEPS CHAIN', pattern: 'ELBOW EXTENSION', muscles: 'triceps (long head)', topNote: 'Slow the eccentric to 4 s or add a backpack.' },
-  { id: 'squat', name: 'SQUAT CHAIN', pattern: 'SINGLE-LEG SQUAT', muscles: 'quads · glutes · balance', topNote: 'Loaded backpack, or a 2-s pause at the bottom of each rep.' },
-  { id: 'lunge', name: 'LUNGE CHAIN', pattern: 'SPLIT-STANCE KNEE', muscles: 'quads · glutes · adductors', topNote: 'Loaded backpack, deeper deficit, or 3-s descents.' },
-  { id: 'hinge', name: 'NORDIC CHAIN', pattern: 'KNEE FLEXION / HINGE', muscles: 'hamstrings · glutes', topNote: 'Full Nordics with hands behind the head, or a backpack on the back.' },
-  { id: 'glute', name: 'HIP THRUST CHAIN', pattern: 'HIP EXTENSION', muscles: 'glutes · hamstrings', topNote: 'Loaded backpack on the hips, 2-s squeeze at the top.' },
-  { id: 'calf', name: 'CALF CHAIN', pattern: 'ANKLE', muscles: 'calves', topNote: 'Loaded backpack, 3-s pause at the stretch.' },
-  { id: 'hangcore', name: 'HANGING CORE CHAIN', pattern: 'HIP FLEXION / ANTI-EXTENSION', muscles: 'abs · hip flexors · grip', topNote: 'Slow 4-s lowers, or ankle weights.' },
-  { id: 'lsit', name: 'L-SIT CHAIN', pattern: 'COMPRESSION HOLD', muscles: 'abs · hip flexors · triceps', topNote: 'Longer holds, or move to V-sit attempts.' },
-  { id: 'side', name: 'SIDE CHAIN', pattern: 'LATERAL CORE', muscles: 'obliques · adductors · QL', topNote: 'Add hip dips or a slow leg lift during the hold.' },
-  { id: 'dragon', name: 'DRAGON FLAG CHAIN', pattern: 'ANTERIOR CORE', muscles: 'abs · hip flexors · lats', topNote: 'Slow 5-s lowers, or single-leg dragon flags.' },
+  { id: 'pull', name: 'Pull-up', pattern: 'Vertical pull', muscles: 'lats · upper back · biceps · grip', topNote: 'Add load with a backpack, or chase reps on the one-arm pull-up.' },
+  { id: 'chin', name: 'Chin-up', pattern: 'Vertical pull · underhand', muscles: 'lats · biceps · forearms', topNote: 'Add load with a backpack.' },
+  { id: 'muscleup', name: 'Muscle-up', pattern: 'Explosive pull', muscles: 'lats · upper back · triceps', topNote: 'Chase clean reps, then add load.', needsClearance: true },
+  { id: 'row', name: 'Row', pattern: 'Horizontal pull', muscles: 'mid-back · rear delts · biceps', topNote: 'Add a backpack on the chest, a 2-s pause, or swap to rings when you get them.' },
+  { id: 'frontlever', name: 'Front lever', pattern: 'Straight-arm pull · hold', muscles: 'lats · core · scapular depressors', topNote: 'Longer holds, then front lever raises and pulls.' },
+  { id: 'planche', name: 'Planche', pattern: 'Straight-arm push · hold', muscles: 'front delts · biceps tendon · core', topNote: 'Longer holds, then planche push-ups.' },
+  { id: 'push', name: 'Push-up', pattern: 'Horizontal push', muscles: 'chest · front delts · triceps', topNote: 'Add a loaded backpack, a 2-s pause at the bottom, or a deficit (hands on books).' },
+  { id: 'vpush', name: 'Handstand push-up', pattern: 'Vertical push', muscles: 'shoulders · triceps · upper chest', topNote: 'Deeper deficit, or a 2-s pause at the bottom.' },
+  { id: 'dip', name: 'Dip', pattern: 'Dip', muscles: 'chest · triceps · front delts', topNote: 'Add a loaded backpack or slow the eccentric to 4 s.' },
+  { id: 'squat', name: 'Squat', pattern: 'Single-leg squat', muscles: 'quads · glutes · balance', topNote: 'Loaded backpack, or a 2-s pause at the bottom of each rep.' },
+  { id: 'lunge', name: 'Lunge', pattern: 'Split-stance knee', muscles: 'quads · glutes · adductors', topNote: 'Loaded backpack, deeper deficit, or 3-s descents.' },
+  { id: 'hinge', name: 'Nordic', pattern: 'Knee flexion', muscles: 'hamstrings · glutes', topNote: 'A backpack on the back, or slower descents.' },
+  { id: 'glute', name: 'Hip thrust', pattern: 'Hip extension', muscles: 'glutes · hamstrings', topNote: 'Loaded backpack on the hips, 2-s squeeze at the top.' },
+  { id: 'calf', name: 'Calf', pattern: 'Ankle', muscles: 'calves', topNote: 'Loaded backpack, 3-s pause at the stretch.' },
+  { id: 'hangcore', name: 'Hanging core', pattern: 'Hip flexion', muscles: 'abs · hip flexors · grip', topNote: 'Slow 4-s lowers, or ankle weights.' },
+  { id: 'lsit', name: 'L-sit', pattern: 'Compression · hold', muscles: 'abs · hip flexors · triceps', topNote: 'Longer holds, then V-sit presses.' },
+  { id: 'side', name: 'Side plank', pattern: 'Lateral core · hold', muscles: 'obliques · adductors', topNote: 'Add hip dips or a slow leg lift during the hold.' },
+  { id: 'dragon', name: 'Dragon flag', pattern: 'Anterior core', muscles: 'abs · hip flexors · lats', topNote: 'Slow 5-s lowers, or single-leg dragon flags.' },
 ];
 
 export function progressionById(id: string | undefined): Progression | undefined {

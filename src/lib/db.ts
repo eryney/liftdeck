@@ -1,6 +1,6 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type {
-  AppSettings, BodyMeasurement, BoxingAttendance, Exercise,
+  AppSettings, BodyMeasurement, Exercise,
   WorkoutPlan, WorkoutSession, WorkoutTemplate,
 } from '../types';
 import { SCHEMA_VERSION } from '../types';
@@ -15,7 +15,6 @@ export interface DBShape {
   templates: WorkoutTemplate[];
   plans: WorkoutPlan[];
   sessions: WorkoutSession[];
-  boxing: BoxingAttendance[];
   measurements: BodyMeasurement[];
 }
 
@@ -32,6 +31,7 @@ export function getDB(): Promise<IDBPDatabase> {
           db.createObjectStore('plans', { keyPath: 'id' });
           const sessions = db.createObjectStore('sessions', { keyPath: 'id' });
           sessions.createIndex('date', 'date');
+          // 'boxing' store from v1–v3: kept in the schema so old databases open; never read or written
           const boxing = db.createObjectStore('boxing', { keyPath: 'id' });
           boxing.createIndex('date', 'date');
           const meas = db.createObjectStore('measurements', { keyPath: 'id' });
@@ -60,30 +60,24 @@ export function defaultSettings(): AppSettings {
     activePlanId: null,
     startDate: todayISO(),
     units: 'lb',
-    defaultIncrement: 5,
-    compoundRestSec: 120,
-    isolationRestSec: 90,
     maWindowDays: 7,
     soundOn: true,
     vibrateOn: true,
-    askRir: false,
-    goalMode: null,
     seedMarkers: [],
   };
 }
 
 export async function loadAll(): Promise<DBShape> {
   const db = await getDB();
-  const [settings, exercises, templates, plans, sessions, boxing, measurements] = await Promise.all([
+  const [settings, exercises, templates, plans, sessions, measurements] = await Promise.all([
     db.get('settings', 'settings'),
     db.getAll('exercises'),
     db.getAll('templates'),
     db.getAll('plans'),
     db.getAll('sessions'),
-    db.getAll('boxing'),
     db.getAll('measurements'),
   ]);
-  return { settings, exercises, templates, plans, sessions, boxing, measurements };
+  return { settings, exercises, templates, plans, sessions, measurements };
 }
 
 export async function put(store: string, value: unknown): Promise<void> {
