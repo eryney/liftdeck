@@ -74,7 +74,7 @@ export function ChainsScreen() {
       {others.length > 0 && (
         <>
           <h2 className="section">Other chains</h2>
-          <p className="faint tiny" style={{ margin: '0 0 6px' }}>Not in the program right now. Swap one in during a session, or add it under Settings → Program.</p>
+          <p className="faint tiny" style={{ margin: '0 0 6px' }}>Optional chains stay out of automatic progression unless you add them. Lever, handstand, and muscle-up skills need suitable equipment and preparation.</p>
           {others.map((c) => (
             <ChainCard key={c.p.id} c={c} onOpen={() => setOpen(c.p.id)} />
           ))}

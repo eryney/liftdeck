@@ -17,6 +17,8 @@ export interface Exercise {
   bodyweight?: boolean;
   /** Resistance comes from a band; never prescribe automatic lb increases. */
   bandResistance?: boolean;
+  /** Progress by reps or hold time, without adding external weight. */
+  repsOnly?: boolean;
   custom?: boolean;
   /**
    * Progression chain this variation belongs to (see data/progressions.ts) and its position in it.
@@ -124,6 +126,8 @@ export interface ExerciseSession {
   bodyweight?: boolean;
   /** Resistance comes from a band; never prescribe automatic lb increases. */
   bandResistance?: boolean;
+  /** Progress by reps or hold time, without adding external weight. */
+  repsOnly?: boolean;
   targetSets: number;
   repMin: number;
   repMax: number;
@@ -134,6 +138,8 @@ export interface ExerciseSession {
   /** added load actually in use (user can override) */
   weight: number;
   sets: SetRecord[];
+  /** Retained active-session logs whose remaining work was replaced on an equipment update. */
+  skippedReason?: string;
   substitutedFor?: string; // name of the originally planned exercise
   result?: ExerciseResult; // computed when session completes
   /** template slot this exercise was built from (so "replace in plan" survives chain resolution) */

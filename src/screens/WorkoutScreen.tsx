@@ -16,7 +16,7 @@ import { beepTimerDone, beepTick, vibrate } from '../lib/sound';
 import { formatDuration, formatShort } from '../lib/dates';
 
 function exDone(es: ExerciseSession): boolean {
-  return es.sets.filter((s) => s.reps != null).length >= es.targetSets;
+  return !!es.skippedReason || es.sets.filter((s) => s.reps != null).length >= es.targetSets;
 }
 
 function loggedCountOf(es: ExerciseSession): number {
@@ -116,7 +116,7 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
   const anyLogged = session.exercises.some((e) => loggedCountOf(e) > 0);
   const loggedCount = loggedCountOf(es);
   const nextSetIdx = es.sets.findIndex((s) => s.reps == null);
-  const partners = es.pairGroup ? session.exercises.filter((e) => e.pairGroup === es.pairGroup && e.id !== es.id) : [];
+  const partners = es.pairGroup ? session.exercises.filter((e) => e.pairGroup === es.pairGroup && e.id !== es.id && !e.skippedReason) : [];
   const doneCount = session.exercises.filter(exDone).length;
 
   const showWarmup = !!session.warmup?.length && (warmupOpen ?? !anyLogged);
@@ -219,6 +219,16 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
       {es.substitutedFor && <div className="accent tiny mt4">Swapped in for {es.substitutedFor}</div>}
 
       {/* ── chain position ── */}
+      {es.skippedReason ? (
+        <div className="card mt16" data-testid="equipment-replacement">
+          <div className="bold">Remaining sets skipped</div>
+          <p className="muted small">{es.skippedReason}</p>
+          <div className="small">Logged: {fmtRepList(es.sets.map((set) => set.reps), es.timed)}</div>
+          {idx < session.exercises.length - 1 && (
+            <button className="btn btn--primary btn--block mt12" onClick={() => setIdx(idx + 1)}>Continue workout</button>
+          )}
+        </div>
+      ) : <>
       {isChain && (
         <div className="mt8" data-testid="chain">
           <button className="spread" style={{ width: '100%' }} onClick={() => setChainOpen(!chainOpen)} aria-expanded={chainOpen}>
@@ -358,7 +368,9 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
       )}
 
       {/* ── load ── */}
-      {es.bandResistance ? (
+      {es.repsOnly ? (
+        <div className="card mt12 small muted">Floor core · build controlled reps or hold time. At the top of the range, repeat with steady form.</div>
+      ) : es.bandResistance ? (
         <div className="card mt12 small muted">Band resistance · keep the same band and grip between sessions. At the rep ceiling on the final variation, use a stronger band and log the reps you complete.</div>
       ) : <button className="row mt12" onClick={() => setEditingWeight(true)} aria-label="edit added load">
         <span className="muted small">{es.weight > 0 ? `Added load +${trimNum(es.weight)} ${state.settings.units}` : 'Bodyweight'}</span>
@@ -393,6 +405,8 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
       {es.sets.length > es.targetSets && (
         <div className="faint tiny mt8">Extra sets are bonus volume. Only the {es.targetSets} prescribed sets decide whether the chain advances.</div>
       )}
+
+      </>}
 
       {allDone ? (
         <button className="btn btn--green btn--block mt24" onClick={finish}>
@@ -508,7 +522,7 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
 function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDone: () => void }) {
   const state = useAppState();
   const performed = session.exercises.filter((es) => es.sets.some((s) => s.reps != null));
-  const advanced = performed.filter((es) => es.result === 'increase' && es.progressionId && es.level != null && es.levelCount != null && es.level < es.levelCount - 1);
+  const advanced = performed.filter((es) => !es.skippedReason && es.result === 'increase' && es.progressionId && es.level != null && es.levelCount != null && es.level < es.levelCount - 1);
   const held = performed.filter((es) => es.result === 'hold' || es.result === 'keep');
   const totalSets = performed.reduce((n, es) => n + es.sets.filter((s) => s.reps != null).length, 0);
   const duration = session.finishedAt ? session.finishedAt - session.startedAt : 0;
@@ -524,7 +538,7 @@ function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDon
         <div className="hr" />
         {performed.map((es) => {
           const isChain = !!es.progressionId;
-          const lbl = isChain ? chainResultText(es.result, es) : { ...resultLabel(es.result), detail: '' };
+          const lbl = es.skippedReason ? { text: 'Replaced', glyph: '↺', cls: 'muted', detail: '' } : isChain ? chainResultText(es.result, es) : { ...resultLabel(es.result), detail: '' };
           const complete = isComplete(es);
           const next = isChain && es.result === 'increase' ? adjacentVariation(state.exercises, es.exerciseId, 1) : null;
           const prev = isChain && es.result === 'reduce' ? adjacentVariation(state.exercises, es.exerciseId, -1) : null;
@@ -541,7 +555,7 @@ function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDon
               <div className={`${lbl.cls} small`} style={{ textAlign: 'right' }}>
                 <div className="bold">{lbl.glyph} {lbl.text}</div>
                 <div className="tiny faint">
-                  {isChain ? (
+                  {es.skippedReason ? <>logged before setup update</> : isChain ? (
                     <>
                       {es.result === 'increase' && next && <>next: {next.name}</>}
                       {es.result === 'increase' && !next && <>top of chain · {es.bandResistance ? 'stronger band' : 'add load'}</>}
@@ -552,8 +566,8 @@ function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDon
                     </>
                   ) : (
                     <>
-                      {es.result === 'increase' && (es.bandResistance ? <>try a stronger band</> : <>next: +{trimNum(es.weight + es.increment)} lb</>)}
-                      {es.result === 'reduce' && (es.bandResistance ? <>try a lighter band</> : <>try: +{trimNum(Math.max(0, es.weight - es.increment))} lb</>)}
+                      {es.result === 'increase' && (es.repsOnly ? <>repeat with steady form</> : es.bandResistance ? <>try a stronger band</> : <>next: +{trimNum(es.weight + es.increment)} lb</>)}
+                      {es.result === 'reduce' && (es.repsOnly ? <>shorten the range or hold</> : es.bandResistance ? <>try a lighter band</> : <>try: +{trimNum(Math.max(0, es.weight - es.increment))} lb</>)}
                       {(es.result === 'hold' || es.result === 'keep') && <>same load · +1 next time</>}
                       {es.result === 'incomplete' && complete === false && <>no decision</>}
                     </>

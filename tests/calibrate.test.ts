@@ -32,7 +32,8 @@ describe('calibration', () => {
     const out = applyCalibration(SEED_TEMPLATES, { pull: '12+', push: '30+', squat: 'pistol', bands: false });
     expect(slotIds(TPL_UA, out)).toContain('archer-pull-up');
     expect(slotIds(TPL_UA, out)).toContain('pseudo-planche-push-up');
-    expect(slotIds(TPL_UA, out)).toContain('elevated-pike-push-up');
+    expect(slotIds(TPL_UA, out)).toContain('band-shoulder-press');
+    expect(slotIds(TPL_UA, out)).not.toContain('elevated-pike-push-up');
     expect(slotIds(TPL_UB, out)).toContain('archer-chin-up');
     expect(slotIds(TPL_LA, out)).toContain('pistol-squat');
     expect(slotIds(TPL_LB, out)).toContain('skater-squat');

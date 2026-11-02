@@ -29,7 +29,7 @@ describe('the bundled program', () => {
     }
   });
 
-  it('is an upper/lower rotation with every strength chain trained once or twice a week', () => {
+  it('is an upper/lower rotation with its strength chains trained once or twice a week', () => {
     const rot = SEED_PLAN.weeklyGoals.find((g) => g.kind === 'rotation')!;
     expect(rot.kind === 'rotation' && rot.templateIds).toEqual([TPL_UA, TPL_LA, TPL_UB, TPL_LB]);
     expect(rot).toMatchObject({ minimum: 3, target: 4, max: 5, minGapHours: 20 });
@@ -43,8 +43,8 @@ describe('the bundled program', () => {
         if (p) chainExposures.set(p, (chainExposures.get(p) ?? 0) + 1);
       }
     }
-    // the bar skills are in
-    for (const id of ['pull', 'chin', 'bandrow', 'frontlever', 'planche', 'push', 'vpush', 'dip', 'squat', 'lunge', 'hinge', 'glute', 'calf', 'hangcore', 'lsit', 'side', 'dragon']) {
+    // the strength chains stay in the rotation
+    for (const id of ['pull', 'chin', 'bandrow', 'push', 'dip', 'squat', 'lunge', 'hinge', 'glute', 'calf', 'lsit', 'side']) {
       expect(chainExposures.get(id), `${id} is trained`).toBeGreaterThanOrEqual(1);
       expect(chainExposures.get(id), `${id} at most twice`).toBeLessThanOrEqual(2);
     }
@@ -69,8 +69,8 @@ describe('the bundled program', () => {
     const ua = SEED_TEMPLATES.find((t) => t.id === TPL_UA)!;
     expect(ua.exercises[0]).toMatchObject({ exerciseId: 'pull-up', sets: 3, repMin: 5, repMax: 8, superset: true });
     expect(ua.exercises[1]).toMatchObject({ exerciseId: 'push-up', sets: 3, repMin: 5, repMax: 8 });
-    expect(ua.exercises[4]).toMatchObject({ exerciseId: 'tuck-front-lever', repMin: 10, repMax: 20 });
-    expect(ua.exercises[5]).toMatchObject({ exerciseId: 'planche-lean' });
+    expect(ua.exercises[4]).toMatchObject({ exerciseId: 'band-pull-apart', repMin: 12, repMax: 20 });
+    expect(ua.exercises[5]).toMatchObject({ exerciseId: 'band-curl' });
     for (const t of SEED_TEMPLATES) {
       expect(t.warmup?.length).toBeGreaterThan(0);
       if (t.id !== TPL_FLOW) expect(t.exercises.some((te) => te.superset)).toBe(true);

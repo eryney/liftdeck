@@ -52,7 +52,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           options={[
             ['0-4', '0 to 4', 'incline push-ups, bench dips'],
             ['5-14', '5 to 14', 'push-ups'],
-            ['15-29', '15 to 29', 'diamond push-ups, elevated pike'],
+            ['15-29', '15 to 29', 'diamond push-ups'],
             ['30+', '30 or more', 'pseudo planche push-ups'],
           ]}
         />
@@ -83,7 +83,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="eyebrow">Liftdeck</div>
       <h1 className="title" style={{ fontSize: 34 }}>Get strong on a pull-up bar.</h1>
       <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
-        Pull-up bar and resistance bands, with a wall and sturdy chairs for some movements. Rows use a band under your feet. Four sessions a week, about 45 minutes each.
+        Pull-up bar and resistance bands, with a wall and sturdy chairs for some movements. Rows use a band under your feet; core work comes off the bar. Four sessions a week, about 45 minutes each.
       </p>
 
       <div className="card mt24">

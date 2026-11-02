@@ -1,3 +1,4 @@
+import { EXERCISE_LIBRARY } from './exercises';
 import type { TemplateExercise, WorkoutPlan, WorkoutTemplate } from '../types';
 
 // ── BAR STRENGTH · the default program ──────────────────────────────────────────────────────────
@@ -18,8 +19,6 @@ import type { TemplateExercise, WorkoutPlan, WorkoutTemplate } from '../types';
 //     above last time
 //   · 2–3 min rest beats 1 min for strength and size (Schoenfeld 2016); antagonist supersets give each
 //     muscle ~3 min while the session stays short (Weakley 2017; Coleman 2024)
-//   · isometric holds build strength near the trained position (Lum & Barbosa 2019); the front lever and
-//     planche progressions are the straight-arm strength work that bars make possible (Low, Overcoming Gravity)
 //   · stalls are handled by a short deload (reset targets to the floor) or a volume block one rung down
 //     rather than by grinding (Low; Coleman 2024 deload trial)
 // Chain order and graduation rules follow the r/bodyweightfitness Recommended Routine and Overcoming Gravity.
@@ -51,7 +50,7 @@ function slots(prefix: string, rows: Slot[]): TemplateExercise[] {
     repMin,
     repMax,
     restSec,
-    increment: exerciseId.startsWith('band-') ? 0 : 5,
+    increment: EXERCISE_LIBRARY.some((e) => e.id === exerciseId && (e.bandResistance || e.repsOnly)) ? 0 : 5,
     startWeight: 0,
     ...(flags?.superset ? { superset: true } : {}),
     ...(flags?.lockVariation ? { lockVariation: true } : {}),
@@ -83,11 +82,11 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
     exercises: slots('ua', [
       ['pull-up', 3, 5, 8, 90, { superset: true }], // PULL-UP CHAIN · advance at 3×8
       ['push-up', 3, 5, 8, 90], // PUSH-UP CHAIN
-      ['pike-push-up', 3, 5, 8, 75, { superset: true }], // HANDSTAND CHAIN
+      ['band-shoulder-press', 3, 8, 15, 75, { superset: true }], // STANDING BAND PRESS
       ['band-bent-over-row', 3, 8, 15, 75], // BAND ROW CHAIN
-      ['tuck-front-lever', 3, 10, 20, 60, { superset: true }], // FRONT LEVER CHAIN · seconds · advance at 3×20 s
-      ['planche-lean', 3, 10, 20, 60], // PLANCHE CHAIN · seconds
-      ['hanging-knee-raise', 3, 8, 12, 45], // HANGING CORE CHAIN
+      ['band-pull-apart', 3, 12, 20, 60, { superset: true }], // UPPER BACK · standing
+      ['band-curl', 3, 8, 15, 60], // BICEPS · standing
+      ['dead-bug', 3, 8, 12, 45], // FLOOR CORE
     ]),
   },
   {
@@ -114,8 +113,8 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
       ['chair-dip', 3, 6, 10, 90], // DIP CHAIN
       ['band-bent-over-row', 3, 8, 15, 75, { superset: true }], // BAND ROW CHAIN · second weekly exposure
       ['push-up', 3, 5, 8, 75], // PUSH-UP CHAIN · second weekly exposure
-      ['reverse-crunch', 3, 5, 8, 60, { superset: true }], // DRAGON FLAG CHAIN
-      ['wall-handstand-hold', 3, 20, 45, 60], // shoulders · seconds · fixed
+      ['floor-reverse-crunch', 3, 8, 12, 60, { superset: true }], // FLOOR CORE
+      ['band-shoulder-press', 3, 8, 15, 60], // shoulders · standing
       ['prone-y-raise', 2, 12, 20, 45], // rear delts · fixed · swap to band face pull once you have bands
     ]),
   },
@@ -129,7 +128,7 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
       ['single-leg-hip-thrust', 4, 10, 15, 90], // HIP THRUST CHAIN · per side
       ['sliding-leg-curl', 3, 5, 8, 60, { superset: true }], // NORDIC CHAIN · second weekly exposure
       ['single-leg-calf-raise', 3, 12, 20, 60], // CALF CHAIN
-      ['hanging-knee-raise', 3, 8, 12, 45, { superset: true }], // HANGING CORE CHAIN
+      ['dead-bug', 3, 8, 12, 45, { superset: true }], // FLOOR CORE
       ['arch-raise', 2, 12, 15, 45], // lower back · fixed
     ]),
   },
@@ -144,7 +143,7 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
       ['frogger', 3, 30, 45, 30],
       ['deep-squat-hold', 3, 30, 60, 30],
       ['dead-hang', 3, 20, 40, 45],
-      ['wall-handstand-hold', 3, 15, 30, 45],
+      ['forearm-plank', 3, 15, 30, 45],
     ]),
   },
 ];

@@ -84,8 +84,9 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
   await expect(page.getByTestId('preview')).toContainText('Pull-up');
   await expect(page.getByTestId('preview')).toContainText('Pull-up · rung 4 of 9');
   await expect(page.getByTestId('preview')).toContainText('5 · 5 · 5');
-  await expect(page.getByTestId('preview')).toContainText('Tuck front lever');
-  await expect(page.getByTestId('preview')).toContainText('10s · 10s · 10s');
+  await expect(page.getByTestId('preview')).toContainText('Band pull-apart');
+  await expect(page.getByTestId('preview')).toContainText('Dead bug');
+  await expect(page.getByTestId('preview')).not.toContainText('Tuck front lever');
 
   await page.getByRole('button', { name: 'Start Upper A' }).click();
 
@@ -112,9 +113,9 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
   await crushAllSets(page);
   await page.getByRole('button', { name: /Complete workout/ }).click();
 
-  // completion: pull-ups 5, 8, 8 hit their targets but not the ceiling → hold; the other six chains advance
+  // completion: pull-ups 5, 8, 8 hit their targets but not the ceiling → hold; the push-up and band-row chains advance
   await expect(page.getByRole('heading', { name: 'Upper A ✓' })).toBeVisible();
-  await expect(page.locator('.complete-card')).toContainText('6 chains advanced');
+  await expect(page.locator('.complete-card')).toContainText('2 chains advanced');
   await expect(page.locator('.complete-card')).toContainText('next: Diamond push-up');
   await expect(page.locator('.complete-card')).toContainText('Hold');
   await expect(page.locator('.complete-card')).not.toContainText(/fail/i);
@@ -221,7 +222,7 @@ test('three flat sessions flag a stall; a one-tap deload drops the targets to th
   await expect(page.getByTestId('chain-basis')).toContainText('You picked this rung');
 });
 
-test('step up/down by hand before the first set; timed holds run a countdown and log seconds', async ({ page }) => {
+test('step up/down before the first set; resume an active session after reload', async ({ page }) => {
   await boot(page);
   await onboard(page);
   await page.getByRole('button', { name: 'Start Upper A' }).click();
@@ -234,18 +235,6 @@ test('step up/down by hand before the first set; timed holds run a countdown and
   await expect(page.getByText('Needs: pull-up bar + band')).toBeVisible();
   await logOn(page, 'Band-assisted pull-up', 8);
   await expect(page.getByRole('button', { name: '↑ Harder' })).toBeDisabled();
-
-  // timed rung: ▶ runs a countdown and logs the target when it ends
-  for (let i = 0; i < 4; i++) await page.getByRole('button', { name: 'next exercise' }).click();
-  await expect(exName(page)).toHaveText('Tuck front lever');
-  await expect(page.getByTestId('targets')).toContainText('10s · 10s · 10s');
-  await page.getByRole('button', { name: 'start hold 10 seconds' }).click();
-  await expect(page.getByTestId('hold')).toBeVisible();
-  await page.clock.fastForward(10_500);
-  await page.waitForTimeout(400);
-  await expect(exName(page)).toHaveText('Planche lean'); // the pair flipped
-  await page.getByRole('button', { name: 'previous exercise' }).click();
-  await expect(page.locator('.set-row--done .set-row__value')).toHaveText('10s');
 
   // leaving keeps the session open; it survives a reload
   await page.getByRole('button', { name: 'Exit' }).click();
@@ -322,4 +311,76 @@ test('band rows show foot setup, rep targets, and resistance guidance', async ({
   await expect(page.getByRole('button', { name: 'edit added load' })).toHaveCount(0);
   await expect(page.getByText(/Band resistance · keep the same band/)).toBeVisible();
   await page.screenshot({ path: 'test-results/band-row-mobile.png', fullPage: true });
+});
+
+
+test('Flow uses a floor plank with a hold timer and no added-load recommendation', async ({ page }) => {
+  await boot(page);
+  await onboard(page);
+  await page.getByRole('button', { name: 'Start something else…' }).click();
+  await page.locator('.sheet .list-row', { hasText: 'Flow' }).click();
+  await goTo(page, 'Forearm plank');
+  await expect(page.getByTestId('targets')).toContainText('15s · 15s · 15s');
+  await expect(page.getByRole('button', { name: 'edit added load' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'start hold 15 seconds' }).click();
+  await expect(page.getByTestId('hold')).toBeVisible();
+  await page.clock.fastForward(15_500);
+  await page.waitForTimeout(400);
+  await goTo(page, 'Forearm plank');
+  await expect(page.locator('.set-row--done .set-row__value')).toHaveText('15s');
+  await page.screenshot({ path: 'test-results/floor-core-mobile.png', fullPage: true });
+});
+
+test('an old active lever keeps its logged set and queues band work for the remaining sets', async ({ page }) => {
+  await boot(page);
+  await onboard(page);
+  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.evaluate(async () => {
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('liftdeck');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const tx = db.transaction(['settings', 'sessions', 'templates'], 'readwrite');
+    const finished = new Promise<void>((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
+    });
+    const settings = tx.objectStore('settings');
+    const settingsRequest = settings.get('settings');
+    settingsRequest.onsuccess = () => {
+      const value = settingsRequest.result;
+      value.seedMarkers = value.seedMarkers.filter((marker: string) => marker !== 'upright-bar-floor-core-v1');
+      settings.put(value);
+    };
+    const sessions = tx.objectStore('sessions');
+    const sessionsRequest = sessions.getAll();
+    sessionsRequest.onsuccess = () => {
+      const value = sessionsRequest.result.find((s) => s.status === 'active');
+      Object.assign(value.exercises[4], {
+        exerciseId: 'tuck-front-lever', name: 'Tuck front lever', timed: true,
+        progressionId: 'frontlever', bandResistance: false, repMin: 10, repMax: 20,
+        targetReps: [10, 10, 10], sets: [{ reps: 12, weight: 0 }, { reps: null, weight: 0 }, { reps: null, weight: 0 }],
+      });
+      sessions.put(value);
+    };
+    await finished;
+    db.close();
+  });
+  await page.reload();
+  await page.getByRole('button', { name: 'Resume workout' }).click();
+  await goTo(page, 'Tuck front lever');
+  await expect(page.getByTestId('equipment-replacement')).toContainText('Remaining sets skipped');
+  await expect(page.getByTestId('equipment-replacement')).toContainText('12');
+  await expect(page.getByRole('list', { name: 'sets' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Continue workout' }).click();
+  await expect(exName(page)).toHaveText('Band pull-apart');
+  await expect(page.getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByTestId('targets')).toContainText('12 · 12');
+  await page.getByRole('button', { name: /Finish early/ }).click();
+  await page.getByRole('button', { name: 'Finish', exact: true }).click();
+  await expect(page.locator('.complete-card')).toContainText('Replaced');
+  await expect(page.locator('.complete-card')).toContainText('logged before setup update');
+  await expect(page.locator('.complete-card')).not.toContainText('next:');
 });

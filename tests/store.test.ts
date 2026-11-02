@@ -8,6 +8,7 @@ import { v3Backup } from './backup.test';
 import { buildBackup, parseBackup } from '../src/lib/backup';
 import { detectStall } from '../src/lib/stall';
 import { applyCalibration } from '../src/lib/calibrate';
+import { HOME_SETUP_MARKER } from '../src/data/homeSetup';
 import { SCHEMA_VERSION } from '../src/types';
 
 async function wipe() {
@@ -51,7 +52,7 @@ describe('fresh install', () => {
     expect(s.state.exercises).toHaveLength(EXERCISE_LIBRARY.length);
     expect(s.state.exercises.find((e) => e.id === 'pull-up')).toMatchObject({ progressionId: 'pull', level: 3 });
     expect(s.state.exercises.find((e) => e.id === 'tuck-front-lever')).toMatchObject({ progressionId: 'frontlever', timed: true });
-    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER] });
+    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER, HOME_SETUP_MARKER] });
     const s2 = new Store();
     await s2.init();
     expect(s2.state.plans).toHaveLength(1);
@@ -187,7 +188,7 @@ describe('progression by variation (chains)', () => {
     expect(pike.pairGroup).toBeDefined();
     expect(pike.pairGroup).not.toBe(pull.pairGroup);
     expect(row.pairGroup).toBe(pike.pairGroup);
-    expect(fl).toMatchObject({ exerciseId: 'tuck-front-lever', timed: true, targetReps: [10, 10, 10] });
+    expect(fl).toMatchObject({ exerciseId: 'band-pull-apart', targetReps: [12, 12, 12] });
     expect(pl.pairGroup).toBe(fl.pairGroup);
     expect(core.pairGroup).toBeUndefined();
   });
@@ -452,5 +453,55 @@ describe('band rows upgrade and progression', () => {
     s.substituteExercise(id, row.id, 'pull-up', false);
     expect(sessionOf(s, id).exercises[3].bandResistance).toBeUndefined();
     expect(sessionOf(s, id).exercises[3].increment).toBe(5);
+  });
+});
+
+describe('upright bar setup migration', () => {
+  it('restores old backups through both equipment migrations and keeps logged sets intact', async () => {
+    const s = new Store();
+    await s.init();
+    const backup = buildBackup(s.exportShape());
+    backup.settings.seedMarkers = [SEED_MARKER];
+    backup.templates = backup.templates.map((t) => t.id !== TPL_UA ? t : {
+      ...t, exercises: t.exercises.map((e, i) => i === 3 ? { ...e, exerciseId: 'table-row' }
+        : i === 4 ? { ...e, exerciseId: 'tuck-front-lever', repMin: 10, repMax: 20 } : e),
+    });
+    const lever = {
+      ...s.previewWorkout(TPL_UA)[4], exerciseId: 'tuck-front-lever', name: 'Tuck front lever',
+      timed: true, progressionId: 'frontlever', bandResistance: undefined,
+      repMin: 10, repMax: 20, targetReps: [10, 10, 10],
+      sets: [{ reps: 12, weight: 0 }, { reps: null, weight: 0 }, { reps: null, weight: 0 }],
+    };
+    const completed = { id: 'old-completed', name: 'Upper A', date: '2026-11-01', startedAt: 1, status: 'completed' as const, exercises: [lever] };
+    const active = { ...completed, id: 'old-active', status: 'active' as const, templateId: TPL_UA, startedAt: 2 };
+    backup.sessions = [completed, active];
+    await s.importBackup(parseBackup(JSON.stringify(backup)));
+    expect(s.templateById(TPL_UA)!.exercises[3].exerciseId).toBe('band-bent-over-row');
+    expect(s.templateById(TPL_UA)!.exercises[4]).toMatchObject({ exerciseId: 'band-pull-apart', repMin: 12, repMax: 20 });
+    expect(sessionOf(s, completed.id)).toEqual(JSON.parse(JSON.stringify(completed)));
+    const upgraded = sessionOf(s, active.id);
+    expect(upgraded.exercises).toHaveLength(2);
+    expect(upgraded.exercises[0].sets).toEqual(lever.sets);
+    expect(upgraded.exercises[1]).toMatchObject({ exerciseId: 'band-pull-apart', targetSets: 2 });
+    s.logSet(active.id, upgraded.exercises[0].id, 1, 10);
+    expect(sessionOf(s, active.id).exercises[0].sets[1].reps).toBeNull();
+    await tick();
+    const again = new Store();
+    await again.init();
+    expect(sessionOf(again, active.id)).toEqual(upgraded);
+    expect(again.state.settings.seedMarkers).toContain(HOME_SETUP_MARKER);
+  });
+
+  it('keeps floor core on the floor at the rep ceiling with no automatic load', async () => {
+    const s = new Store();
+    await s.init();
+    for (let i = 0; i < 4; i++) {
+      const id = s.startWorkout(TPL_UA);
+      const core = sessionOf(s, id).exercises[6];
+      expect(core).toMatchObject({ exerciseId: 'dead-bug', repsOnly: true, weight: 0, increment: 0 });
+      expect(core.progressionId).toBeUndefined();
+      for (let n = 0; n < core.targetSets; n++) s.logSet(id, core.id, n, core.repMax);
+      s.finishWorkout(id);
+    }
   });
 });

@@ -84,7 +84,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
         )}
       </div>
 
-      <p className="muted small mt12">Pull-up bar + bands · rows need only a band under your feet.</p>
+      <p className="muted small mt12">Upright bar work + bands · core work comes off the bar.</p>
 
       {/* ── next up ── */}
       <div className="card card--hero mt16" data-testid="recommended">
@@ -92,7 +92,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
           <>
             <div className="eyebrow">In progress</div>
             <div style={{ fontSize: 24, fontWeight: 800, marginTop: 2 }}>{active.name}</div>
-            <div className="muted small">{active.exercises.filter((e) => e.sets.filter((s) => s.reps != null).length >= e.targetSets).length} of {active.exercises.length} exercises done</div>
+            <div className="muted small">{active.exercises.filter((e) => e.skippedReason || e.sets.filter((s) => s.reps != null).length >= e.targetSets).length} of {active.exercises.length} exercises done</div>
             <button className="btn btn--green btn--block mt16" onClick={() => onOpenWorkout(active.id)}>
               Resume workout
             </button>

@@ -14,7 +14,7 @@ type Row = [
   id: string,
   name: string,
   category: Exercise['category'],
-  flags: { perSide?: boolean; timed?: boolean; band?: boolean },
+  flags: { perSide?: boolean; timed?: boolean; band?: boolean; repsOnly?: boolean },
   chain: string | null,
   gear: string | null,
   cue: string,
@@ -25,6 +25,7 @@ const build = (rows: Row[]): Exercise[] => {
   return rows.map(([id, name, category, flags, chain, gear, cue]) => {
     const ex: Exercise = { id, name, category, equipment: flags.band ? 'band' : 'bodyweight', bodyweight: true, cue };
     if (flags.band && chain !== 'pull' && chain !== 'chin') ex.bandResistance = true;
+    if (flags.repsOnly) ex.repsOnly = true;
     if (flags.perSide) ex.perSide = true;
     if (flags.timed) ex.timed = true;
     if (gear) ex.gear = gear;
@@ -174,6 +175,9 @@ export const EXERCISE_LIBRARY: Exercise[] = build([
   ['dragon-flag', 'Dragon flag', 'Core', {}, 'dragon', 'something to grip behind the head', 'Straight body down and up without the hips sagging. Only the shoulder blades touch.'],
 
   // ── FIXED ACCESSORIES · no chain, progress by reps or seconds ──────────────────────────────
+  ['dead-bug', 'Dead bug', 'Core', { perSide: true, repsOnly: true }, null, 'floor', 'Lie on your back, hips and knees bent to 90 degrees, arms up. Slowly extend one leg and the opposite arm while keeping your lower back on the floor. Return and switch. Count reps per side.'],
+  ['floor-reverse-crunch', 'Floor reverse crunch', 'Core', { repsOnly: true }, null, 'floor', 'Lie on your back with your arms on the floor beside you. Curl your pelvis to lift your hips slightly, then lower slowly. Keep your shoulders on the floor and avoid swinging your legs.'],
+  ['forearm-plank', 'Forearm plank', 'Core', { timed: true, repsOnly: true }, null, 'floor', 'Elbows under shoulders, forearms and toes on the floor. Keep your ribs down and body in a straight line. Breathe throughout the hold.'],
   ['prone-y-raise', 'Prone Y raise', 'Shoulders', {}, null, null, 'Lie face down, arms in a Y, thumbs up. Lift as high as possible, 1-s squeeze. Light but brutal.'],
   ['arch-raise', 'Arch raise', 'Back', {}, null, null, 'Face down, lift the chest and thighs together, 1-s hold at the top. Lower back and glutes.'],
   ['cossack-squat', 'Cossack squat', 'Quads', { perSide: true }, null, null, 'Wide stance, sit all the way to one side with the other leg straight and toes up. Alternate.'],
