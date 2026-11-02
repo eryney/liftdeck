@@ -19,7 +19,7 @@ export interface Calibration {
   bands: boolean;
 }
 
-export const DEFAULT_CALIBRATION: Calibration = { pull: '5-11', push: '5-14', squat: 'split', bands: false };
+export const DEFAULT_CALIBRATION: Calibration = { pull: '5-11', push: '5-14', squat: 'split', bands: true };
 
 /** Map from a template's default starting exercise → the calibrated starting exercise. */
 export function startingRungs(c: Calibration): Record<string, string> {

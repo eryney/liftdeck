@@ -3,7 +3,7 @@ export type Category =
   | 'Quads' | 'Hamstrings' | 'Glutes' | 'Calves' | 'Core'
   | 'Full Body' | 'Cardio' | 'Other';
 
-/** Everything is bodyweight. `band` marks the few exercises that need a resistance band. */
+/** Equipment used by a library exercise. */
 export type Equipment = 'bodyweight' | 'band' | 'other';
 
 export interface Exercise {
@@ -15,6 +15,8 @@ export interface Exercise {
   perSide?: boolean;
   /** always true in the current library; kept so older records read the same */
   bodyweight?: boolean;
+  /** Resistance comes from a band; never prescribe automatic lb increases. */
+  bandResistance?: boolean;
   custom?: boolean;
   /**
    * Progression chain this variation belongs to (see data/progressions.ts) and its position in it.
@@ -120,6 +122,8 @@ export interface ExerciseSession {
   name: string;
   perSide?: boolean;
   bodyweight?: boolean;
+  /** Resistance comes from a band; never prescribe automatic lb increases. */
+  bandResistance?: boolean;
   targetSets: number;
   repMin: number;
   repMax: number;

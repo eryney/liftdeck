@@ -84,6 +84,8 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
         )}
       </div>
 
+      <p className="muted small mt12">Pull-up bar + bands · rows need only a band under your feet.</p>
+
       {/* ── next up ── */}
       <div className="card card--hero mt16" data-testid="recommended">
         {active ? (

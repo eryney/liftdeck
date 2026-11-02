@@ -358,11 +358,13 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
       )}
 
       {/* ── load ── */}
-      <button className="row mt12" onClick={() => setEditingWeight(true)} aria-label="edit added load">
+      {es.bandResistance ? (
+        <div className="card mt12 small muted">Band resistance · keep the same band and grip between sessions. At the rep ceiling on the final variation, use a stronger band and log the reps you complete.</div>
+      ) : <button className="row mt12" onClick={() => setEditingWeight(true)} aria-label="edit added load">
         <span className="muted small">{es.weight > 0 ? `Added load +${trimNum(es.weight)} ${state.settings.units}` : 'Bodyweight'}</span>
         <span className="link">{es.weight > 0 ? 'Change' : '+ add load'}</span>
         {es.variationBasis === 'top' && es.weight === es.suggestedWeight && es.weight > 0 && <span className="pill pill--green">load up</span>}
-      </button>
+      </button>}
 
       <div className="row mt16">
         {isChain && (
@@ -542,7 +544,7 @@ function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDon
                   {isChain ? (
                     <>
                       {es.result === 'increase' && next && <>next: {next.name}</>}
-                      {es.result === 'increase' && !next && <>top of chain · add load</>}
+                      {es.result === 'increase' && !next && <>top of chain · {es.bandResistance ? 'stronger band' : 'add load'}</>}
                       {es.result === 'reduce' && prev && <>try: {prev.name}</>}
                       {!es.deload && (es.result === 'hold' || es.result === 'keep') && <>same rung · +1 next time</>}
                       {es.deload && <>restart just above the floor</>}
@@ -550,8 +552,8 @@ function CompletionOverlay({ session, onDone }: { session: WorkoutSession; onDon
                     </>
                   ) : (
                     <>
-                      {es.result === 'increase' && <>next: +{trimNum(es.weight + es.increment)} lb</>}
-                      {es.result === 'reduce' && <>try: +{trimNum(Math.max(0, es.weight - es.increment))} lb</>}
+                      {es.result === 'increase' && (es.bandResistance ? <>try a stronger band</> : <>next: +{trimNum(es.weight + es.increment)} lb</>)}
+                      {es.result === 'reduce' && (es.bandResistance ? <>try a lighter band</> : <>try: +{trimNum(Math.max(0, es.weight - es.increment))} lb</>)}
                       {(es.result === 'hold' || es.result === 'keep') && <>same load · +1 next time</>}
                       {es.result === 'incomplete' && complete === false && <>no decision</>}
                     </>

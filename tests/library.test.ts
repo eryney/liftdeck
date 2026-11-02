@@ -44,7 +44,7 @@ describe('the bundled program', () => {
       }
     }
     // the bar skills are in
-    for (const id of ['pull', 'chin', 'row', 'frontlever', 'planche', 'push', 'vpush', 'dip', 'squat', 'lunge', 'hinge', 'glute', 'calf', 'hangcore', 'lsit', 'side', 'dragon']) {
+    for (const id of ['pull', 'chin', 'bandrow', 'frontlever', 'planche', 'push', 'vpush', 'dip', 'squat', 'lunge', 'hinge', 'glute', 'calf', 'hangcore', 'lsit', 'side', 'dragon']) {
       expect(chainExposures.get(id), `${id} is trained`).toBeGreaterThanOrEqual(1);
       expect(chainExposures.get(id), `${id} at most twice`).toBeLessThanOrEqual(2);
     }

@@ -2,7 +2,7 @@ import type { TemplateExercise, WorkoutPlan, WorkoutTemplate } from '../types';
 
 // ── BAR STRENGTH · the default program ──────────────────────────────────────────────────────────
 //
-// Bodyweight only: a pull-up bar, the floor, a wall, a sturdy table, a couple of chairs. Four ~45-minute
+// Bodyweight and bands: a pull-up bar, the floor, a wall, bands, and a couple of chairs. Four ~45-minute
 // sessions a week in a fixed rotation UPPER A → LOWER A → UPPER B → LOWER B, so every muscle is trained
 // twice a week with 12–18 hard sets. Progressive overload comes from the progression chains
 // (data/exercises.ts): reach the rep ceiling on every prescribed set → the next session serves the next
@@ -31,6 +31,7 @@ export const TPL_UB = 'tpl_bs_upper_b';
 export const TPL_LB = 'tpl_bs_lower_b';
 export const TPL_FLOW = 'tpl_bs_flow';
 export const SEED_MARKER = 'bar-strength-v4';
+export const BAND_ROWS_MARKER = 'band-rows-v1';
 
 /** Ids of the plan and templates from the previous default (CALISTHENICS CUT, v3), replaced on upgrade. */
 export const LEGACY_PLAN_IDS = ['plan_calisthenics_cut_flex', 'plan_boxer_cut_flex', 'plan_default'];
@@ -50,7 +51,7 @@ function slots(prefix: string, rows: Slot[]): TemplateExercise[] {
     repMin,
     repMax,
     restSec,
-    increment: 5,
+    increment: exerciseId.startsWith('band-') ? 0 : 5,
     startWeight: 0,
     ...(flags?.superset ? { superset: true } : {}),
     ...(flags?.lockVariation ? { lockVariation: true } : {}),
@@ -83,7 +84,7 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
       ['pull-up', 3, 5, 8, 90, { superset: true }], // PULL-UP CHAIN · advance at 3×8
       ['push-up', 3, 5, 8, 90], // PUSH-UP CHAIN
       ['pike-push-up', 3, 5, 8, 75, { superset: true }], // HANDSTAND CHAIN
-      ['table-row', 3, 6, 10, 75], // ROW CHAIN
+      ['band-bent-over-row', 3, 8, 15, 75], // BAND ROW CHAIN
       ['tuck-front-lever', 3, 10, 20, 60, { superset: true }], // FRONT LEVER CHAIN · seconds · advance at 3×20 s
       ['planche-lean', 3, 10, 20, 60], // PLANCHE CHAIN · seconds
       ['hanging-knee-raise', 3, 8, 12, 45], // HANGING CORE CHAIN
@@ -111,7 +112,7 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
     exercises: slots('ub', [
       ['chin-up', 3, 6, 10, 90, { superset: true }], // CHIN-UP CHAIN
       ['chair-dip', 3, 6, 10, 90], // DIP CHAIN
-      ['table-row', 3, 6, 10, 75, { superset: true }], // ROW CHAIN · second weekly exposure
+      ['band-bent-over-row', 3, 8, 15, 75, { superset: true }], // BAND ROW CHAIN · second weekly exposure
       ['push-up', 3, 5, 8, 75], // PUSH-UP CHAIN · second weekly exposure
       ['reverse-crunch', 3, 5, 8, 60, { superset: true }], // DRAGON FLAG CHAIN
       ['wall-handstand-hold', 3, 20, 45, 60], // shoulders · seconds · fixed

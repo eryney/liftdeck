@@ -1,8 +1,8 @@
 import type { Exercise } from '../types';
 
 /**
- * The library: bodyweight only. A pull-up bar, the floor, a wall, a sturdy table, a couple of chairs.
- * A few optional band moves for people who pick up a set of bands.
+ * The library: bodyweight and resistance bands. Default rows need only a band under your feet.
+ * Furniture-based alternatives remain available for people with suitable equipment.
  *
  * Chains are ordered easiest → hardest; `level` is the index in the chain. Progressive overload here is
  * "move to the next variation", not "add plates". Rung order follows the r/bodyweightfitness Recommended
@@ -24,6 +24,7 @@ const build = (rows: Row[]): Exercise[] => {
   const levelByChain = new Map<string, number>();
   return rows.map(([id, name, category, flags, chain, gear, cue]) => {
     const ex: Exercise = { id, name, category, equipment: flags.band ? 'band' : 'bodyweight', bodyweight: true, cue };
+    if (flags.band && chain !== 'pull' && chain !== 'chin') ex.bandResistance = true;
     if (flags.perSide) ex.perSide = true;
     if (flags.timed) ex.timed = true;
     if (gear) ex.gear = gear;
@@ -72,6 +73,11 @@ export const EXERCISE_LIBRARY: Exercise[] = build([
   ['archer-table-row', 'Archer row', 'Back', { perSide: true }, 'row', 'sturdy table', 'Pull to one hand while the other arm straightens along the edge. Count reps per side.'],
   ['one-arm-table-row', 'One-arm row (table)', 'Back', { perSide: true }, 'row', 'sturdy table', 'One hand on the edge, the other across the chest. Hips square, no rotation.'],
 
+  // Band rows have a separate chain so progression never requires a table or an anchor.
+  ['band-bent-over-row', 'Band bent-over row', 'Back', { band: true }, 'bandrow', 'band under both feet', 'Stand on the middle of the band with both feet. Hinge at the hips, keep your back neutral, and pull toward the lower ribs. Lower under control. Keep the same band and grip through this chain.'],
+  ['band-row-paused', 'Band bent-over row (paused)', 'Back', { band: true }, 'bandrow', 'band under both feet', 'Use the same band and grip as your regular row. Hinge, pull to the lower ribs, hold for 2 s, then lower under control. Keep your torso still.'],
+  ['band-row-slow', 'Band bent-over row (slow return)', 'Back', { band: true }, 'bandrow', 'band under both feet', 'Use the same band and grip. Pull to the lower ribs, hold 2 s, and lower for 4 s. At the rep ceiling, choose a stronger band and log the reps you can complete with it.'],
+
   // ── FRONT LEVER CHAIN · straight-arm pull, timed ───────────────────────────────────────────
   ['tuck-front-lever', 'Tuck front lever', 'Back', { timed: true }, 'frontlever', 'pull-up bar', 'Hang, pull the hips up to bar height with knees tucked to the chest, arms straight. Back flat and parallel to the floor. Seconds held.'],
   ['advanced-tuck-front-lever', 'Advanced tuck front lever', 'Back', { timed: true }, 'frontlever', 'pull-up bar', 'Same, but open the hips so the thighs point straight down. Flat back, straight arms. Seconds held.'],
@@ -86,7 +92,7 @@ export const EXERCISE_LIBRARY: Exercise[] = build([
   ['straddle-planche', 'Straddle planche', 'Shoulders', { timed: true }, 'planche', 'floor or two chairs', 'Legs straight and wide, body horizontal, arms straight. Seconds held.'],
 
   // ── PUSH-UP CHAIN · horizontal push ────────────────────────────────────────────────────────
-  ['incline-push-up', 'Incline push-up', 'Chest', {}, 'push', 'table or counter', 'Hands on a table edge. Body straight, elbows ~45°, chest to the edge.'],
+  ['incline-push-up', 'Incline push-up', 'Chest', {}, 'push', 'wall or counter', 'Hands on a wall or stable counter. Body straight, elbows ~45°, chest to the edge.'],
   ['push-up', 'Push-up', 'Chest', {}, 'push', null, 'Hands under shoulders, body one straight line. Chest to the floor, full lockout.'],
   ['diamond-push-up', 'Diamond push-up', 'Triceps', {}, 'push', null, 'Thumbs and index fingers touch under the chest. Elbows tight to the ribs.'],
   ['decline-push-up', 'Decline push-up', 'Chest', {}, 'push', 'chair', 'Feet on a chair, hands under shoulders. Nose to the floor, no sagging hips.'],
@@ -186,6 +192,13 @@ export const EXERCISE_LIBRARY: Exercise[] = build([
   ['band-curl', 'Band curl', 'Biceps', { band: true }, null, 'band', 'Stand on the band, curl without swinging. Slow eccentric.'],
   ['band-pushdown', 'Band triceps pushdown', 'Triceps', { band: true }, null, 'band anchored to the bar', 'Elbows pinned, extend to lockout and squeeze.'],
   ['band-row', 'Band row', 'Back', { band: true }, null, 'band anchored to a door or the bar', 'Pull to the lower ribs, shoulder blades together, pause 1 s.'],
+  ['band-seated-row', 'Band seated row', 'Back', { band: true }, null, 'band around both feet', 'Sit with knees slightly bent. Loop the band securely around the soles of both shoes, keep it away from your toes, and pull to your ribs without leaning back.'],
+  ['band-pull-apart', 'Band pull-apart', 'Shoulders', { band: true }, null, 'band', 'Hold the band at chest height with soft elbows. Pull your hands apart, squeeze the shoulder blades, and return slowly.'],
+  ['band-chest-press', 'Band chest press', 'Chest', { band: true }, null, 'band around upper back', 'Wrap the band across your upper back, below your neck. Press your hands forward from chest height, then return slowly.'],
+  ['band-shoulder-press', 'Band shoulder press', 'Shoulders', { band: true }, null, 'band under both feet', 'Stand on the band, hands at shoulder height. Brace your trunk and press overhead without arching your lower back.'],
+  ['band-front-squat', 'Band front squat', 'Quads', { band: true }, null, 'band under both feet', 'Stand on the band and hold the ends at shoulder height. Squat with heels down, then stand. Keep the band off your neck.'],
+  ['band-romanian-deadlift', 'Band Romanian deadlift', 'Hamstrings', { band: true }, null, 'band under both feet', 'Stand on the band with soft knees. Push your hips back, keep your back neutral, then stand by driving your hips forward.'],
+  ['band-overhead-triceps-extension', 'Band overhead triceps extension', 'Triceps', { band: true, perSide: true }, null, 'band', 'Hold one end behind your lower back and the other behind your head. Keep the upper elbow pointed up, straighten that arm, and lower slowly. Repeat on the other side.'],
   ['band-pallof-press', 'Band Pallof press', 'Core', { perSide: true, band: true }, null, 'band anchored at chest height', 'Side-on to the anchor, press the band straight out and back. Hips do not rotate.'],
 ]);
 

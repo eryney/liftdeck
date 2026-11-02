@@ -308,3 +308,18 @@ test('works offline after first load', async ({ page, context }) => {
   await expect(page.getByTestId('recommended')).toContainText('Upper A');
   await context.setOffline(false);
 });
+
+
+test('band rows show foot setup, rep targets, and resistance guidance', async ({ page }) => {
+  await boot(page);
+  await onboard(page);
+  await expect(page.getByTestId('preview')).toContainText('Band bent-over row');
+  await expect(page.getByTestId('preview')).not.toContainText('Table row');
+  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await goTo(page, 'Band bent-over row');
+  await expect(page.locator('.cue')).toContainText('Stand on the middle of the band');
+  await expect(page.getByTestId('targets')).toContainText('8 · 8 · 8');
+  await expect(page.getByRole('button', { name: 'edit added load' })).toHaveCount(0);
+  await expect(page.getByText(/Band resistance · keep the same band/)).toBeVisible();
+  await page.screenshot({ path: 'test-results/band-row-mobile.png', fullPage: true });
+});

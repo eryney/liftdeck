@@ -6,7 +6,7 @@ import type {
 import { bulkPut, clearAllStores, defaultSettings, del, loadAll, put } from '../lib/db';
 import type { DBShape } from '../lib/db';
 import { EXERCISE_LIBRARY, LIBRARY_IDS } from '../data/exercises';
-import { LEGACY_PLAN_IDS, LEGACY_TEMPLATE_IDS, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES } from '../data/seedPlan';
+import { BAND_ROWS_MARKER, LEGACY_PLAN_IDS, LEGACY_TEMPLATE_IDS, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES } from '../data/seedPlan';
 import { newId } from '../lib/ids';
 import { todayISO } from '../lib/dates';
 import { computeResult, lastPerformance, suggestWeight } from '../lib/progression';
@@ -93,7 +93,7 @@ export class Store {
     await bulkPut('exercises', EXERCISE_LIBRARY);
     await bulkPut('templates', SEED_TEMPLATES);
     await put('plans', SEED_PLAN);
-    await put('settings', { ...defaultSettings(), seedMarkers: [SEED_MARKER] } satisfies AppSettings);
+    await put('settings', { ...defaultSettings(), seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER] } satisfies AppSettings);
   }
 
   /**
@@ -142,6 +142,23 @@ export class Store {
     } else if (settings.activePlanId == null || !plans.some((p) => p.id === settings.activePlanId)) {
       settings.activePlanId = plans.some((p) => p.id === PLAN_ID) ? PLAN_ID : plans[0]?.id ?? null;
     }
+    if (!markers.has(BAND_ROWS_MARKER)) {
+      // Change future sessions only. Preserve slot ids, custom programming, and all session snapshots.
+      const tableRows = new Set(['table-row-incline', 'table-row', 'table-row-feet-elevated', 'archer-table-row', 'one-arm-table-row', 'inverted-row']);
+      for (const tpl of data.templates) {
+        if (LEGACY_TEMPLATE_IDS.includes(tpl.id)) continue;
+        if (!tpl.exercises.some((slot) => tableRows.has(slot.exerciseId))) continue;
+        await put('templates', {
+          ...tpl,
+          exercises: tpl.exercises.map((slot) => tableRows.has(slot.exerciseId) ? {
+            ...slot, exerciseId: 'band-bent-over-row', startWeight: 0, increment: 0,
+            ...(slot.repMin === 6 && slot.repMax === 10 ? { repMin: 8, repMax: 15 } : {}),
+          } : slot),
+        });
+      }
+      markers.add(BAND_ROWS_MARKER);
+      settings.seedMarkers = [...markers];
+    }
     if (JSON.stringify(settings) !== before) await put('settings', settings);
   }
 
@@ -188,7 +205,9 @@ export class Store {
     const exerciseId = choice?.exerciseId ?? tpl.exerciseId;
     const ex = this.exerciseById(exerciseId);
     let weight: number;
-    if (!choice) {
+    if (ex?.bandResistance) {
+      weight = 0;
+    } else if (!choice) {
       weight = suggestWeight(sessions, exerciseId, tpl).weight;
     } else if (choice.basis === 'top' || choice.basis === 'hold') {
       // same rung as last time: ordinary load logic applies (top of chain → +increment)
@@ -206,11 +225,12 @@ export class Store {
       name: ex?.name ?? exerciseId,
       perSide: ex?.perSide,
       bodyweight: true,
+      bandResistance: ex?.bandResistance,
       targetSets: tpl.sets,
       repMin: tpl.repMin,
       repMax: tpl.repMax,
       restSec: tpl.restSec,
-      increment: tpl.increment,
+      increment: ex?.bandResistance ? 0 : tpl.increment,
       suggestedWeight: weight,
       weight,
       sets: Array.from({ length: tpl.sets }, () => ({ reps: null, weight })),
@@ -380,14 +400,16 @@ export class Store {
     const session = this.state.sessions.find((s) => s.id === sessionId);
     const old = session?.exercises.find((e) => e.id === esId);
     if (!session || !old) return;
-    const tplLike = { increment: old.increment, startWeight: 0 };
-    const { weight } = suggestWeight(this.state.sessions, newExerciseId, tplLike);
+    const tplLike = { increment: old.bandResistance ? 5 : old.increment, startWeight: 0 };
+    const weight = ex.bandResistance ? 0 : suggestWeight(this.state.sessions, newExerciseId, tplLike).weight;
     const chain = ex.progressionId ? this.state.exercises.filter((e) => e.progressionId === ex.progressionId) : [];
     this.updateExerciseSession(sessionId, esId, (es) => {
       const next: ExerciseSession = {
         ...es,
         exerciseId: newExerciseId,
         name: ex.name,
+        bandResistance: ex.bandResistance,
+        increment: ex.bandResistance ? 0 : tplLike.increment,
         perSide: ex.perSide,
         bodyweight: true,
         substitutedFor: es.substitutedFor ?? es.name,
@@ -415,7 +437,7 @@ export class Store {
         if (idx < 0) idx = tpl.exercises.findIndex((te) => te.exerciseId === old.exerciseId);
         if (idx >= 0) {
           const exercises = tpl.exercises.map((te, i) =>
-            i === idx ? { ...te, exerciseId: newExerciseId } : te,
+            i === idx ? { ...te, exerciseId: newExerciseId, increment: ex.bandResistance ? 0 : tplLike.increment } : te,
           );
           this.saveTemplate({ ...tpl, exercises });
         }
@@ -433,13 +455,15 @@ export class Store {
     if (!session || !es) return;
     const target = adjacentVariation(this.state.exercises, es.exerciseId, dir);
     if (!target) return;
-    const weight = lastPerformance(this.state.sessions, target.id)?.es.weight ?? 0;
+    const weight = target.bandResistance ? 0 : lastPerformance(this.state.sessions, target.id)?.es.weight ?? 0;
     const chainLen = this.state.exercises.filter((e) => e.progressionId === target.progressionId).length;
     this.updateExerciseSession(sessionId, esId, (cur) => {
       const next: ExerciseSession = {
         ...cur,
         exerciseId: target.id,
         name: target.name,
+        bandResistance: target.bandResistance,
+        increment: target.bandResistance ? 0 : cur.bandResistance ? 5 : cur.increment,
         perSide: target.perSide,
         bodyweight: true,
         suggestedWeight: weight,

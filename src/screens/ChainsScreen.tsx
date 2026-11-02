@@ -100,7 +100,7 @@ function ChainCard({ c, onOpen }: { c: ChainStatus; onOpen: () => void }) {
         ) : c.basis === 'advance' ? (
           <span className="pill pill--green">new rung next</span>
         ) : c.basis === 'top' ? (
-          <span className="pill pill--green">top · add load</span>
+          <span className="pill pill--green">top · {c.current?.bandResistance ? 'stronger band' : 'add load'}</span>
         ) : c.basis === 'regress' ? (
           <span className="pill pill--amber">easier next</span>
         ) : null}

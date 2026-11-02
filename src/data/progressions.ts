@@ -24,6 +24,7 @@ export const PROGRESSIONS: Progression[] = [
   { id: 'pull', name: 'Pull-up', pattern: 'Vertical pull', muscles: 'lats · upper back · biceps · grip', topNote: 'Add load with a backpack, or chase reps on the one-arm pull-up.' },
   { id: 'chin', name: 'Chin-up', pattern: 'Vertical pull · underhand', muscles: 'lats · biceps · forearms', topNote: 'Add load with a backpack.' },
   { id: 'muscleup', name: 'Muscle-up', pattern: 'Explosive pull', muscles: 'lats · upper back · triceps', topNote: 'Chase clean reps, then add load.', needsClearance: true },
+  { id: 'bandrow', name: 'Band row', pattern: 'Horizontal pull', muscles: 'mid-back · rear delts · biceps', topNote: 'Use a stronger band when every set reaches the ceiling. Log the reps you complete; keep band and grip consistent between sessions.' },
   { id: 'row', name: 'Row', pattern: 'Horizontal pull', muscles: 'mid-back · rear delts · biceps', topNote: 'Add a backpack on the chest, a 2-s pause, or swap to rings when you get them.' },
   { id: 'frontlever', name: 'Front lever', pattern: 'Straight-arm pull · hold', muscles: 'lats · core · scapular depressors', topNote: 'Longer holds, then front lever raises and pulls.' },
   { id: 'planche', name: 'Planche', pattern: 'Straight-arm push · hold', muscles: 'front delts · biceps tendon · core', topNote: 'Longer holds, then planche push-ups.' },

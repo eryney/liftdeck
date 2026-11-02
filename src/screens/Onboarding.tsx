@@ -41,7 +41,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
           ]}
         />
         <button className={`option ${c.bands ? 'on' : ''}`} onClick={() => setC({ ...c, bands: !c.bands })}>
-          <span className="grow">I have resistance bands</span>
+          <span className="grow">Use band assistance for pull-ups</span>
           <span className={`toggle ${c.bands ? 'on' : ''}`}><i /></span>
         </button>
 
@@ -83,7 +83,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="eyebrow">Liftdeck</div>
       <h1 className="title" style={{ fontSize: 34 }}>Get strong on a pull-up bar.</h1>
       <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
-        Bodyweight only. A bar, a wall, a table, two chairs. Four sessions a week, about 45 minutes each.
+        Pull-up bar and resistance bands, with a wall and sturdy chairs for some movements. Rows use a band under your feet. Four sessions a week, about 45 minutes each.
       </p>
 
       <div className="card mt24">

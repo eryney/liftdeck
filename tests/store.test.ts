@@ -2,7 +2,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/store/store';
 import { bulkPut, closeDB, getDB, loadAll, put } from '../src/lib/db';
-import { PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES, TPL_LA, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import { BAND_ROWS_MARKER, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES, TPL_LA, TPL_UA, TPL_UB } from '../src/data/seedPlan';
 import { EXERCISE_LIBRARY } from '../src/data/exercises';
 import { v3Backup } from './backup.test';
 import { buildBackup, parseBackup } from '../src/lib/backup';
@@ -51,7 +51,7 @@ describe('fresh install', () => {
     expect(s.state.exercises).toHaveLength(EXERCISE_LIBRARY.length);
     expect(s.state.exercises.find((e) => e.id === 'pull-up')).toMatchObject({ progressionId: 'pull', level: 3 });
     expect(s.state.exercises.find((e) => e.id === 'tuck-front-lever')).toMatchObject({ progressionId: 'frontlever', timed: true });
-    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER] });
+    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER] });
     const s2 = new Store();
     await s2.init();
     expect(s2.state.plans).toHaveLength(1);
@@ -392,5 +392,65 @@ describe('program edits', () => {
     s.addMeasurement('2026-09-01', 179.5);
     expect(s.state.measurements).toHaveLength(1);
     expect(s.state.measurements[0]).toMatchObject({ weightLb: 179.5, waistIn: 34 });
+  });
+});
+
+
+describe('band rows upgrade and progression', () => {
+  it('migrates old row slots once without rewriting history, active sessions, or other programming', async () => {
+    const s = new Store();
+    await s.init();
+    const tpl = s.templateById(TPL_UA)!;
+    const legacy = { ...tpl, exercises: tpl.exercises.map((e) => e.exerciseId === 'band-bent-over-row'
+      ? { ...e, exerciseId: 'table-row', sets: 4, repMin: 6, repMax: 10, startWeight: 10 } : e) };
+    await put('templates', legacy);
+    await put('settings', { ...s.state.settings, seedMarkers: [SEED_MARKER] });
+    const oldRow = { ...s.previewWorkout(TPL_UA)[3], exerciseId: 'table-row', name: 'Table row (horizontal)', progressionId: 'row', sets: [{ reps: 10, weight: 10 }] };
+    const completed = { id: 'old-row-session', date: '2026-09-01', name: 'Upper A', status: 'completed' as const, startedAt: 1, exercises: [oldRow] };
+    const active = { ...completed, id: 'active-row-session', status: 'active' as const };
+    await bulkPut('sessions', [completed, active]);
+
+    const upgraded = new Store();
+    await upgraded.init();
+    expect(upgraded.templateById(TPL_UA)!.exercises[3]).toMatchObject({
+      id: legacy.exercises[3].id, exerciseId: 'band-bent-over-row', sets: 4, repMin: 8, repMax: 15, startWeight: 0,
+    });
+    expect(upgraded.templateById(TPL_UA)!.exercises[0]).toEqual(legacy.exercises[0]);
+    expect(sessionOf(upgraded, completed.id)).toEqual(completed);
+    expect(sessionOf(upgraded, active.id)).toEqual(active);
+    expect(upgraded.previewWorkout(TPL_UA)[3]).toMatchObject({ exerciseId: 'band-bent-over-row', variationBasis: 'start', weight: 0 });
+    expect(upgraded.state.settings.seedMarkers).toContain(BAND_ROWS_MARKER);
+
+    // An intentional later edit survives boot; migration runs only once.
+    await put('templates', legacy);
+    const again = new Store();
+    await again.init();
+    expect(again.templateById(TPL_UA)).toEqual(legacy);
+  });
+
+  it('advances band-only rungs across both upper days without inventing pound increases', async () => {
+    const s = new Store();
+    await s.init();
+    const expected = ['band-bent-over-row', 'band-row-paused', 'band-row-slow', 'band-row-slow'];
+    for (const [i, exerciseId] of expected.entries()) {
+      const id = s.startWorkout(i % 2 ? TPL_UB : TPL_UA, `2026-09-0${i + 1}`);
+      const row = sessionOf(s, id).exercises.find((e) => e.progressionId === 'bandrow')!;
+      expect(row).toMatchObject({ exerciseId, bandResistance: true, weight: 0, suggestedWeight: 0, increment: 0 });
+      for (let n = 0; n < row.targetSets; n++) s.logSet(id, row.id, n, row.repMax);
+      s.finishWorkout(id);
+      await tick();
+    }
+  });
+
+  it('uses band resistance for manual swaps and restores load controls for bodyweight moves', async () => {
+    const s = new Store();
+    await s.init();
+    const id = s.startWorkout(TPL_UA);
+    const row = sessionOf(s, id).exercises[3];
+    s.substituteExercise(id, row.id, 'band-seated-row', false);
+    expect(sessionOf(s, id).exercises[3]).toMatchObject({ bandResistance: true, weight: 0, increment: 0 });
+    s.substituteExercise(id, row.id, 'pull-up', false);
+    expect(sessionOf(s, id).exercises[3].bandResistance).toBeUndefined();
+    expect(sessionOf(s, id).exercises[3].increment).toBe(5);
   });
 });

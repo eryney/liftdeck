@@ -102,14 +102,14 @@ export function adjacentVariation(exercises: Exercise[], exerciseId: string, dir
 }
 
 /** Human text for why today's variation was chosen. */
-export function basisText(c: Pick<ExerciseSession, 'variationBasis' | 'fromName' | 'level' | 'levelCount'>): { text: string; cls: string } | null {
+export function basisText(c: Pick<ExerciseSession, 'variationBasis' | 'fromName' | 'level' | 'levelCount' | 'bandResistance'>): { text: string; cls: string } | null {
   switch (c.variationBasis) {
     case 'advance':
       return { text: `New rung${c.fromName ? ` · you hit every target on ${c.fromName}` : ''}`, cls: 'green' };
     case 'regress':
       return { text: `Easier rung suggested${c.fromName ? ` · two sessions under the range on ${c.fromName}` : ''} · your call`, cls: 'amber' };
     case 'top':
-      return { text: 'Top of the chain · add load, a pause, or a slower lowering', cls: 'green' };
+      return { text: c.bandResistance ? 'Top of the chain · try a stronger band' : 'Top of the chain · add load, a pause, or a slower lowering', cls: 'green' };
     case 'hold':
       return { text: 'Same rung · one more rep than last time', cls: 'muted' };
     case 'start':
@@ -124,7 +124,7 @@ export function basisText(c: Pick<ExerciseSession, 'variationBasis' | 'fromName'
 /** Result label text for an exercise that progresses by variation rather than load. */
 export function chainResultText(
   result: ExerciseSession['result'],
-  es: Pick<ExerciseSession, 'level' | 'levelCount' | 'deload'>,
+  es: Pick<ExerciseSession, 'level' | 'levelCount' | 'deload' | 'bandResistance'>,
 ): { text: string; glyph: string; cls: string; detail: string } {
   const atTop = es.level != null && es.levelCount != null && es.level >= es.levelCount - 1;
   if (es.deload) return { text: 'Deload', glyph: '↺', cls: 'accent', detail: 'targets restart just above the floor' };
@@ -132,7 +132,7 @@ export function chainResultText(
     case 'increase':
     case 'progress':
       return atTop
-        ? { text: 'Top of chain', glyph: '▲', cls: 'green', detail: 'add load, a pause, or a slower lowering' }
+        ? { text: 'Top of chain', glyph: '▲', cls: 'green', detail: es.bandResistance ? 'try a stronger band' : 'add load, a pause, or a slower lowering' }
         : { text: 'Advance', glyph: '▲', cls: 'green', detail: 'next variation next time' };
     case 'reduce':
       return { text: 'Step back', glyph: '↓', cls: 'amber', detail: 'easier variation suggested' };

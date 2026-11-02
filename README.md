@@ -1,6 +1,6 @@
 # LIFTDECK
 
-A bodyweight strength PWA for people with a pull-up bar and not much else. All data lives on your phone.
+A bodyweight and resistance-band strength PWA for people with a pull-up bar. All data lives on your phone.
 
 Ships with one program, **Bar Strength**: four ~45-minute sessions a week in a fixed rotation Upper A → Lower A → Upper B → Lower B, plus an optional Flow session. Every exercise sits on a **progression chain** of harder variations (pull-up → archer → typewriter → one-arm). Hit the rep ceiling on every set and the next session serves the next rung. Stall for three sessions and the app offers a deload or a volume block one rung down.
 
@@ -41,19 +41,27 @@ npm run build   # outputs dist/ (regenerates icons, typechecks, bundles, builds 
 
 Open the deployed URL in Safari → Share → **Add to Home Screen**. Storage is per-origin, so install from the URL you plan to keep, and export a backup now and then (Settings → Export backup).
 
+## Your equipment
+
+Both upper workouts use band bent-over rows, 3×8–15, with the band held under both feet. The band row chain advances to a 2-second pause, then a 4-second return using the same band and grip. At the top, use a stronger band and log the reps you complete. Band resistance never gets automatic pound increases.
+
+The exercise picker includes seated band rows, pull-aparts, chest presses, shoulder presses, front squats, Romanian deadlifts, and overhead triceps extensions. These don't need a table or a separate anchor. Anchored exercises list their anchor in the gear notes. Some other program exercises still use chairs, a couch, a wall, or a step.
+
+Existing table and low-bar row slots switch to band rows once on upgrade, including restored older backups. Slot IDs and custom set counts stay intact. Completed and active workout snapshots stay intact; use Swap for a row in a workout that's already underway.
+
 ## The program
 
 | Session | Pairs (alternate sets, rest between) | Sets × reps |
 |---|---|---|
-| **Upper A** · pull-up + push-up | Pull-up chain ⇄ Push-up chain · Handstand push-up chain ⇄ Row chain · Front lever chain ⇄ Planche chain · Hanging core chain | 3×5–8 · 3×5–8 · 3×5–8 · 3×6–10 · 3×10–20 s · 3×10–20 s · 3×8–12 |
+| **Upper A** · pull-up + push-up | Pull-up chain ⇄ Push-up chain · Handstand push-up chain ⇄ Band row chain · Front lever chain ⇄ Planche chain · Hanging core chain | 3×5–8 · 3×5–8 · 3×5–8 · 3×8–15 · 3×10–20 s · 3×10–20 s · 3×8–12 |
 | **Lower A** · squat + Nordic | Squat chain ⇄ Nordic chain · Cossack squat ⇄ Calf chain · L-sit chain ⇄ Side plank chain | 4×5–8 · 4×5–8 · 3×8–12 · 3×12–20 · 3×15–30 s · 2×20–40 s |
-| **Upper B** · chin-up + dip | Chin-up chain ⇄ Dip chain · Row chain ⇄ Push-up chain · Dragon flag chain ⇄ Wall handstand hold · Prone Y raise | 3×6–10 · 3×6–10 · 3×6–10 · 3×5–8 · 3×5–8 · 3×20–45 s · 2×12–20 |
+| **Upper B** · chin-up + dip | Chin-up chain ⇄ Dip chain · Band row chain ⇄ Push-up chain · Dragon flag chain ⇄ Wall handstand hold · Prone Y raise | 3×6–10 · 3×6–10 · 3×8–15 · 3×5–8 · 3×5–8 · 3×20–45 s · 2×12–20 |
 | **Lower B** · lunge + hip thrust | Lunge chain ⇄ Hip thrust chain · Nordic chain ⇄ Calf chain · Hanging core chain ⇄ Arch raise | 4×8–12 · 4×10–15 · 3×5–8 · 3×12–20 · 3×8–12 · 2×12–15 |
 | **Flow** (optional, 0–2/wk) | Bear crawl, monkey, frogger, deep squat hold, dead hang, wall handstand hold | 3×30–45 s |
 
 Weekly goal: minimum 3, target 4, soft max 5, sessions at least 20 h apart (upper and lower alternate, so back-to-back days are fine). Every muscle gets two exposures and 12–18 hard sets a week. Rest is 90 s between paired primaries, 60–75 s elsewhere, which works out to ~3 min per muscle.
 
-**Chains** (18 of them): pull-up, chin-up, muscle-up (library only, needs a bar with clearance), row, front lever, planche, push-up, handstand push-up, dip, squat, lunge, Nordic, hip thrust, calf, hanging core, L-sit, side plank, dragon flag. Each ends with a "top of chain" note (backpack load, pauses, slower lowering).
+**Chains** (19 of them): pull-up, chin-up, muscle-up (library only, needs a bar with clearance), table row (optional), band row, front lever, planche, push-up, handstand push-up, dip, squat, lunge, Nordic, hip thrust, calf, hanging core, L-sit, side plank, dragon flag. Each ends with a "top of chain" note (backpack load, pauses, slower lowering).
 
 **Why these numbers.** Strength is best served by hard sets of ~5–8 on the primary movements, while hypertrophy is similar from ~6 to 30 reps when sets end near failure (Schoenfeld 2017, 2021; Lopez 2021). 10–20 weekly hard sets per muscle, twice a week, is the productive range for trained people (Schoenfeld 2016, 2017; Baz-Valle 2022). Closer to failure grows more (Refalo 2023; Robinson 2024), so every set has an exact target one rep above last time. 2–3 min rest beats 1 min for both strength and size (Schoenfeld 2016); antagonist supersets give each muscle that rest while the session stays short (Weakley 2017; Coleman 2024). Isometric holds build strength near the trained position (Lum & Barbosa 2019); the front lever and planche progressions are the straight-arm strength work a bar makes possible (Low, *Overcoming Gravity*). Chain order and graduation rules follow the r/bodyweightfitness Recommended Routine and *Overcoming Gravity*.
 
