@@ -73,29 +73,29 @@ async function logOn(page: Page, exercise: string, reps: number) {
   await goTo(page, exercise);
 }
 
-test('Upper A end to end: pairing, exact targets, chain advance, chains view, next session rung', async ({ page }) => {
+test('Full Body A end to end: pairing, exact targets, chain advance, chains view, next session rung', async ({ page }) => {
   await boot(page);
   await onboard(page);
 
   // Today: the first session of the rotation, with a full preview
   await expect(page.getByTestId('recommended')).toContainText('Next up');
-  await expect(page.getByTestId('recommended')).toContainText('Upper A');
-  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '0 of 4 sessions this week');
+  await expect(page.getByTestId('recommended')).toContainText('Full Body A');
+  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '0 of 3 sessions this week');
   await expect(page.getByTestId('preview')).toContainText('Pull-up');
   await expect(page.getByTestId('preview')).toContainText('Pull-up · rung 4 of 9');
   await expect(page.getByTestId('preview')).toContainText('5 · 5 · 5');
-  await expect(page.getByTestId('preview')).toContainText('Band pull-apart');
+  await expect(page.getByTestId('preview')).toContainText('Band shoulder press');
   await expect(page.getByTestId('preview')).toContainText('Dead bug');
   await expect(page.getByTestId('preview')).not.toContainText('Tuck front lever');
 
-  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
 
   // warm-up, first rung, chain position, pairing
-  await expect(page.getByTestId('warmup')).toContainText('Bear crawl');
+  await expect(page.getByTestId('warmup')).toContainText('easy hip hinges');
   await expect(exName(page)).toHaveText('Pull-up');
   await expect(page.getByTestId('chain')).toContainText('Pull-up chain · rung 4 of 9');
   await expect(page.getByTestId('chain-basis')).toContainText('Starting rung');
-  await expect(page.getByTestId('pair-note')).toContainText('Paired with Push-up');
+  await expect(page.getByTestId('pair-note')).toContainText('Paired with Bulgarian split squat');
   await expect(page.locator('.cue')).toContainText('Dead-hang start');
   await expect(page.getByTestId('targets')).toContainText('5 · 5 · 5');
   await expect(page.getByText('First time · no previous data')).toBeVisible();
@@ -103,8 +103,8 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
   // ✓ logs the target in one tap, starts the rest timer, and flips to the paired exercise
   await page.getByRole('button', { name: 'hit 5' }).click();
   await expect(page.getByTestId('rest-bar')).toBeVisible();
-  await expect(exName(page)).toHaveText('Push-up');
-  await expect(page.getByTestId('chain')).toContainText('Push-up chain · rung 2 of 8');
+  await expect(exName(page)).toHaveText('Bulgarian split squat');
+  await expect(page.getByTestId('chain')).toContainText('Squat chain');
   await page.getByRole('button', { name: 'previous exercise' }).click();
   await expect(page.locator('.set-row--done .set-row__value')).toHaveText('5');
   await page.getByRole('button', { name: 'next exercise' }).click();
@@ -114,8 +114,8 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
   await page.getByRole('button', { name: /Complete workout/ }).click();
 
   // completion: pull-ups 5, 8, 8 hit their targets but not the ceiling → hold; the push-up and band-row chains advance
-  await expect(page.getByRole('heading', { name: 'Upper A ✓' })).toBeVisible();
-  await expect(page.locator('.complete-card')).toContainText('2 chains advanced');
+  await expect(page.getByRole('heading', { name: 'Full Body A ✓' })).toBeVisible();
+  await expect(page.locator('.complete-card')).toContainText('chains advanced');
   await expect(page.locator('.complete-card')).toContainText('next: Diamond push-up');
   await expect(page.locator('.complete-card')).toContainText('Hold');
   await expect(page.locator('.complete-card')).not.toContainText(/fail/i);
@@ -123,7 +123,7 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
 
   // Today reflects it
   await expect(page.getByText('Done today')).toBeVisible();
-  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '1 of 4 sessions this week');
+  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '1 of 3 sessions this week');
   await expect(page.getByTestId('recommended')).toContainText('Rest');
   await expect(page.getByTestId('recommended')).toContainText('Done for today');
 
@@ -140,19 +140,19 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
 
   // History: the day is marked
   await tab(page, 'History').click();
-  await page.getByRole('button', { name: '2026-09-01, Upper A' }).click();
-  await expect(page.locator('.sheet')).toContainText('Upper A');
+  await page.getByRole('button', { name: '2026-09-01, Full Body A' }).click();
+  await expect(page.locator('.sheet')).toContainText('Full Body A');
   await expect(page.locator('.sheet')).toContainText('Advance');
   await page.locator('.sheet-backdrop').click({ position: { x: 10, y: 10 } });
 
-  // Next Upper A: pull-ups hold with +1 per set (clamped at the ceiling); push chain serves the new rung
+  // Next Full Body A: pull-ups hold with +1 per set (clamped at the ceiling); push chain serves the new rung
   await tab(page, 'Today').click();
   await page.getByRole('button', { name: 'Start something else…' }).click();
-  await page.locator('.sheet .list-row', { hasText: 'Upper A' }).click();
+  await page.locator('.sheet .list-row', { hasText: 'Full Body A' }).click();
   await expect(exName(page)).toHaveText('Pull-up');
   await expect(page.getByTestId('chain-basis')).toContainText('Same rung');
   await expect(page.getByTestId('targets')).toContainText('6 · 8 · 8');
-  await page.getByRole('button', { name: 'next exercise' }).click();
+  await goTo(page, 'Diamond push-up');
   await expect(exName(page)).toHaveText('Diamond push-up');
   await expect(page.getByTestId('chain-basis')).toContainText('New rung');
   await expect(page.getByText(/First time on this rung/)).toBeVisible();
@@ -162,7 +162,7 @@ test('Upper A end to end: pairing, exact targets, chain advance, chains view, ne
 test('a mediocre session holds the rung in neutral language; the next session asks for one more rep', async ({ page }) => {
   await boot(page);
   await onboard(page);
-  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
   for (let i = 0; i < 3; i++) {
     await logOn(page, 'Pull-up', 5);
     await logOn(page, 'Push-up', 5);
@@ -170,14 +170,14 @@ test('a mediocre session holds the rung in neutral language; the next session as
   await dismissOverlays(page);
   await page.getByRole('button', { name: /Finish early/ }).click();
   await page.getByRole('button', { name: 'Finish', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Upper A ✓' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Full Body A ✓' })).toBeVisible();
   await expect(page.locator('.complete-card')).toContainText('Hold');
   await expect(page.locator('.complete-card')).toContainText('same rung');
   await expect(page.locator('.complete-card')).not.toContainText(/fail|step back/i);
   await page.getByRole('button', { name: 'Done' }).click();
 
   await page.getByRole('button', { name: 'Start something else…' }).click();
-  await page.locator('.sheet .list-row', { hasText: 'Upper A' }).click();
+  await page.locator('.sheet .list-row', { hasText: 'Full Body A' }).click();
   await expect(exName(page)).toHaveText('Pull-up');
   await expect(page.getByTestId('chain-basis')).toContainText('Same rung');
   await expect(page.getByTestId('targets')).toContainText('6 · 6 · 6');
@@ -187,10 +187,10 @@ test('three flat sessions flag a stall; a one-tap deload drops the targets to th
   await boot(page);
   await onboard(page);
   for (let s = 0; s < 3; s++) {
-    if (s === 0) await page.getByRole('button', { name: 'Start Upper A' }).click();
+    if (s === 0) await page.getByRole('button', { name: 'Start Full Body A' }).click();
     else {
       await page.getByRole('button', { name: 'Start something else…' }).click();
-      await page.locator('.sheet .list-row', { hasText: 'Upper A' }).click();
+      await page.locator('.sheet .list-row', { hasText: 'Full Body A' }).click();
     }
     await expect(page.getByTestId('stall')).toHaveCount(0);
     await logOn(page, 'Pull-up', 6);
@@ -205,7 +205,7 @@ test('three flat sessions flag a stall; a one-tap deload drops the targets to th
   await expect(page.getByTestId('chain-pull')).toContainText('stalled');
   await tab(page, 'Today').click();
   await page.getByRole('button', { name: 'Start something else…' }).click();
-  await page.locator('.sheet .list-row', { hasText: 'Upper A' }).click();
+  await page.locator('.sheet .list-row', { hasText: 'Full Body A' }).click();
   await expect(page.getByTestId('stall')).toContainText('Stalled · 3 sessions without progress');
   await expect(page.getByTestId('stall')).toContainText('17 → 17');
   await expect(page.getByTestId('targets')).toContainText('6 · 6 · 6');
@@ -225,7 +225,7 @@ test('three flat sessions flag a stall; a one-tap deload drops the targets to th
 test('step up/down before the first set; resume an active session after reload', async ({ page }) => {
   await boot(page);
   await onboard(page);
-  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
   await page.getByRole('button', { name: '↑ Harder' }).click();
   await expect(exName(page)).toHaveText('Archer pull-up');
   await expect(page.getByTestId('chain-basis')).toContainText('You picked this rung');
@@ -260,21 +260,21 @@ test('calibration sets the starting rungs; settings edit the program; body weigh
   await expect(page.getByTestId('preview')).toContainText('Incline push-up');
   await expect(page.getByTestId('preview')).toContainText('Pull-up · rung 2 of 9');
 
-  // Settings → program → edit Lower A: it starts on bodyweight squats after calibration
+  // Settings → program → edit Full Body A: it starts on bodyweight squats after calibration
   await tab(page, 'Settings').click();
-  await page.locator('.list-row', { hasText: 'Lower A' }).click();
+  await page.locator('.list-row', { hasText: 'Full Body A' }).click();
   await expect(page.locator('.list-row', { hasText: 'Bodyweight squat' })).toBeVisible();
   await page.locator('.list-row', { hasText: 'Bodyweight squat' }).locator('button.grow').click();
   await expect(page.locator('.sheet')).toContainText('Squat chain · this is the starting rung only');
   await page.getByRole('button', { name: 'increase sets' }).click();
   await page.getByRole('button', { name: 'Done' }).click();
-  await expect(page.locator('.list-row', { hasText: 'Bodyweight squat' })).toContainText('5 × 5–8');
+  await expect(page.locator('.list-row', { hasText: 'Bodyweight squat' })).toContainText('4 × 5–8');
   await page.getByRole('button', { name: '‹ Settings' }).click();
   await page.getByRole('button', { name: 'Weekly targets' }).click();
-  await page.getByRole('button', { name: 'decrease target' }).click();
+  await page.getByRole('button', { name: 'increase target' }).click();
   await expect(page.locator('.sheet')).toContainText('3');
   await page.getByRole('button', { name: 'Done' }).click();
-  await expect(page.locator('.card', { hasText: 'Bar Strength' })).toContainText('target 3');
+  await expect(page.locator('.card', { hasText: 'Full Body · 3 days' })).toContainText('target 4');
 
   // History → weigh in
   await tab(page, 'History').click();
@@ -294,7 +294,7 @@ test('works offline after first load', async ({ page, context }) => {
   await page.waitForTimeout(1500); // let the service worker precache
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByTestId('recommended')).toContainText('Upper A');
+  await expect(page.getByTestId('recommended')).toContainText('Full Body A');
   await context.setOffline(false);
 });
 
@@ -304,7 +304,7 @@ test('band rows show foot setup, rep targets, and resistance guidance', async ({
   await onboard(page);
   await expect(page.getByTestId('preview')).toContainText('Band bent-over row');
   await expect(page.getByTestId('preview')).not.toContainText('Table row');
-  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
   await goTo(page, 'Band bent-over row');
   await expect(page.locator('.cue')).toContainText('Stand on the middle of the band');
   await expect(page.getByTestId('targets')).toContainText('8 · 8 · 8');
@@ -314,27 +314,47 @@ test('band rows show foot setup, rep targets, and resistance guidance', async ({
 });
 
 
-test('Flow uses a floor plank with a hold timer and no added-load recommendation', async ({ page }) => {
+test('side planks record timed holds', async ({ page }) => {
   await boot(page);
   await onboard(page);
-  await page.getByRole('button', { name: 'Start something else…' }).click();
-  await page.locator('.sheet .list-row', { hasText: 'Flow' }).click();
-  await goTo(page, 'Forearm plank');
-  await expect(page.getByTestId('targets')).toContainText('15s · 15s · 15s');
-  await expect(page.getByRole('button', { name: 'edit added load' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'start hold 15 seconds' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
+  await goTo(page, 'Side plank');
+  await expect(page.getByTestId('targets')).toContainText('20s · 20s');
+  await page.getByRole('button', { name: 'start hold 20 seconds' }).click();
   await expect(page.getByTestId('hold')).toBeVisible();
-  await page.clock.fastForward(15_500);
+  await page.clock.fastForward(20_500);
   await page.waitForTimeout(400);
-  await goTo(page, 'Forearm plank');
-  await expect(page.locator('.set-row--done .set-row__value')).toHaveText('15s');
+  await goTo(page, 'Side plank');
+  await expect(page.locator('.set-row--done .set-row__value')).toHaveText('20s');
   await page.screenshot({ path: 'test-results/floor-core-mobile.png', fullPage: true });
+});
+
+test('cardio and accessories share two optional sessions without counting as strength', async ({ page }) => {
+  await boot(page);
+  await onboard(page);
+  await expect(page.getByTestId('weekly-rhythm')).toContainText('3 full-body');
+  await page.getByRole('button', { name: 'Log cardio', exact: true }).click();
+  await page.getByLabel('cardio activity').selectOption('Cycle');
+  await page.getByLabel('cardio minutes').fill('30');
+  await page.getByRole('button', { name: 'Save cardio' }).click();
+  await expect(page.getByTestId('optional-sessions')).toContainText('1 of 2');
+  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '0 of 3 sessions this week');
+  await page.reload();
+  await expect(page.getByText('Cycle · 30 min')).toBeVisible();
+  await page.getByRole('button', { name: 'Start Accessories' }).click();
+  await crushAllSets(page);
+  await page.getByRole('button', { name: /Complete workout/ }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByTestId('optional-sessions')).toContainText('2 of 2');
+  await expect(page.getByTestId('week-dots')).toHaveAttribute('aria-label', '0 of 3 sessions this week');
+  await expect(page.getByRole('button', { name: 'Start Full Body A' })).toBeVisible();
+  await page.screenshot({ path: 'test-results/full-body-today-mobile.png', fullPage: true });
 });
 
 test('an old active lever keeps its logged set and queues band work for the remaining sets', async ({ page }) => {
   await boot(page);
   await onboard(page);
-  await page.getByRole('button', { name: 'Start Upper A' }).click();
+  await page.getByRole('button', { name: 'Start Full Body A' }).click();
   await page.evaluate(async () => {
     const db = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('liftdeck');

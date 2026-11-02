@@ -2,9 +2,11 @@ import { useMemo, useState } from 'react';
 import { store, useAppState } from '../store/store';
 import { formatShort, todayISO, WEEKDAY_NAMES, weekdayIndex } from '../lib/dates';
 import { unlockAudio } from '../lib/sound';
+import { CardioLog } from '../components/CardioLog';
+import { TPL_FA } from '../data/fullBodyPlan';
 import { Sheet } from '../components/Sheet';
 import { weightTrend } from '../lib/body';
-import { foundationStreak, rotationGoal, weekAttainment } from '../lib/flex';
+import { foundationStreak, rotationGoal, weekAttainment, workoutGoals, workoutTemplateIds, strengthTemplateIds, optionalTemplateIds } from '../lib/flex';
 import { recommend } from '../lib/recommend';
 import { fmtTargets } from '../lib/prescribe';
 import { detectStall } from '../lib/stall';
@@ -18,6 +20,7 @@ function titleCase(s: string): string {
 export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: string) => void }) {
   const state = useAppState();
   const plan = store.activePlan();
+  const [loggingCardio, setLoggingCardio] = useState(false);
   const [pickTemplate, setPickTemplate] = useState(false);
   const today = todayISO();
   const active = store.activeSession();
@@ -31,7 +34,9 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
 
   const primaryTpl = rec && rec.primary.kind !== 'rest' ? store.templateById(rec.primary.templateId) : undefined;
   const nextTpl = rec?.strength.nextTemplateId ? store.templateById(rec.strength.nextTemplateId) : undefined;
-  const optTpl = rec?.optional ? store.templateById(rec.optional.templateId) : undefined;
+  const optionalGoal = plan ? workoutGoals(plan).find((g) => g.optional) : undefined;
+  const optionalTemplates = optionalGoal ? workoutTemplateIds(optionalGoal).map((id) => store.templateById(id)).filter((t): t is WorkoutTemplate => !!t) : [];
+  const planTemplateIds = plan ? [...strengthTemplateIds(plan), ...optionalTemplateIds(plan)] : [];
   const preview = useMemo(
     () => (!active && primaryTpl ? store.previewWorkout(primaryTpl.id) : []),
     [active?.id, primaryTpl?.id, state.sessions, state.exercises, state.templates],
@@ -43,6 +48,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
   }, [preview, state.sessions]);
 
   function start(templateId: string) {
+    if (store.templateById(templateId)?.activityType === 'cardio') { setLoggingCardio(true); return; }
     unlockAudio();
     onOpenWorkout(store.startWorkout(templateId));
   }
@@ -85,6 +91,12 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
       </div>
 
       <p className="muted small mt12">Upright bar work + bands · core work comes off the bar.</p>
+      {rot?.templateIds.includes(TPL_FA) && (
+        <div className="card mt12 small" data-testid="weekly-rhythm">
+          <div className="bold">{rot.target} full-body sessions{optionalGoal ? ` + 0–${optionalGoal.max ?? optionalGoal.target} optional sessions` : ''}</div>
+          <div className="muted mt4">Example: strength Mon / Wed / Fri; accessories or cardio Tue / Thu. Leave a recovery day between strength sessions.</div>
+        </div>
+      )}
 
       {/* ── next up ── */}
       <div className="card card--hero mt16" data-testid="recommended">
@@ -127,10 +139,16 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
         )}
       </div>
 
-      {optTpl && rec.optional?.visible && !active && rec.primary.kind !== 'strength' && (
-        <button className="btn btn--ghost btn--block mt12" onClick={() => start(optTpl.id)}>
-          {optTpl.name} session · {optTpl.subtitle?.replace(' · optional', '').toLowerCase()}
-        </button>
+      {optionalGoal && !active && (
+        <div className="card mt12" data-testid="optional-sessions">
+          <div className="bold">Accessories or cardio</div>
+          <div className="muted small mt4">{rec.optional?.count ?? 0} of {optionalGoal.max ?? optionalGoal.target} optional sessions this week · separate from strength</div>
+          {(rec.optional?.count ?? 0) < (optionalGoal.max ?? Infinity) && optionalTemplates.map((t) => (
+            <button key={t.id} className="btn btn--ghost btn--block mt8" onClick={() => start(t.id)}>
+              {t.activityType === 'cardio' ? 'Log cardio' : `Start ${t.name}`}
+            </button>
+          ))}
+        </div>
       )}
 
       {completedToday.length > 0 && (
@@ -139,6 +157,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
           {completedToday.map((s) => (
             <div key={s.id} className="mt8">
               <div className="bold">{s.name} ✓</div>
+              {s.cardio && <div className="muted small">{s.cardio.activity} · {s.cardio.minutes} min</div>}
               {s.exercises
                 .filter((es) => es.sets.some((x) => x.reps != null))
                 .map((es) => (
@@ -178,10 +197,12 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
         </div>
       </div>
 
+      {loggingCardio && <CardioLog onClose={() => setLoggingCardio(false)} />}
+
       {pickTemplate && (
         <Sheet onClose={() => setPickTemplate(false)} title="Start a session">
           <div className="mt8">
-            {state.templates.map((t) => {
+            {state.templates.filter((t) => !t.archived || planTemplateIds.includes(t.id)).map((t) => {
               const isNext = t.id === rec.strength.nextTemplateId;
               return (
                 <button
@@ -197,7 +218,7 @@ export function TodayScreen({ onOpenWorkout }: { onOpenWorkout: (sessionId: stri
                     {t.subtitle && <span className="faint tiny" style={{ display: 'block' }}>{t.subtitle}</span>}
                   </span>
                   {isNext && <span className="pill pill--accent">next in rotation</span>}
-                  <span className="faint tiny">{t.exercises.length} ex</span>
+                  <span className="faint tiny">{t.activityType === 'cardio' ? 'minutes' : `${t.exercises.length} ex`}</span>
                 </button>
               );
             })}
@@ -216,7 +237,7 @@ function estimateMinutes(preview: ExerciseSession[]): number {
   let sec = 300;
   for (const e of preview) {
     const work = e.timed ? (e.targetReps?.[0] ?? 20) + 10 : 35;
-    sec += e.targetSets * (work + e.restSec);
+    sec += e.targetSets * (work * (e.perSide ? 2 : 1) + e.restSec);
   }
   return Math.round(sec / 60 / 5) * 5;
 }

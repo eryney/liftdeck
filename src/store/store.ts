@@ -7,7 +7,9 @@ import { bulkPut, clearAllStores, defaultSettings, del, loadAll, put } from '../
 import type { DBShape } from '../lib/db';
 import { EXERCISE_LIBRARY, LIBRARY_IDS } from '../data/exercises';
 import { BAND_ROWS_MARKER, LEGACY_PLAN_IDS, LEGACY_TEMPLATE_IDS, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES } from '../data/seedPlan';
+import { FULL_BODY_MARKER, SPLIT_TEMPLATE_IDS, TPL_CARDIO, fullBodyTemplatesFor } from '../data/fullBodyPlan';
 import { HOME_SETUP_MARKER, adaptActiveHomeSession, adaptHomeTemplate } from '../data/homeSetup';
+import { workoutTemplateIds } from '../lib/flex';
 import { newId } from '../lib/ids';
 import { todayISO } from '../lib/dates';
 import { computeResult, lastPerformance, suggestWeight } from '../lib/progression';
@@ -94,7 +96,7 @@ export class Store {
     await bulkPut('exercises', EXERCISE_LIBRARY);
     await bulkPut('templates', SEED_TEMPLATES);
     await put('plans', SEED_PLAN);
-    await put('settings', { ...defaultSettings(), seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER, HOME_SETUP_MARKER] } satisfies AppSettings);
+    await put('settings', { ...defaultSettings(), seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER, HOME_SETUP_MARKER, FULL_BODY_MARKER] } satisfies AppSettings);
   }
 
   /**
@@ -172,6 +174,18 @@ export class Store {
         if (JSON.stringify(adapted) !== JSON.stringify(session)) await put('sessions', adapted);
       }
       markers.add(HOME_SETUP_MARKER);
+      settings.seedMarkers = [...markers];
+    }
+    if (!markers.has(FULL_BODY_MARKER)) {
+      const current = await loadAll();
+      for (const template of fullBodyTemplatesFor(current.templates)) {
+        if (!current.templates.some((t) => t.id === template.id)) await put('templates', template);
+      }
+      for (const template of current.templates) {
+        if (SPLIT_TEMPLATE_IDS.includes(template.id)) await put('templates', { ...template, archived: true });
+      }
+      await put('plans', SEED_PLAN);
+      markers.add(FULL_BODY_MARKER);
       settings.seedMarkers = [...markers];
     }
     if (JSON.stringify(settings) !== before) await put('settings', settings);
@@ -304,6 +318,7 @@ export class Store {
   startWorkout(templateId: string, date = todayISO()): string {
     const tpl = this.templateById(templateId);
     if (!tpl) throw new Error('template not found');
+    if (tpl.activityType === 'cardio') throw new Error('Use the cardio log to record minutes.');
     const exercises = this.buildSessionExercises(tpl);
     // strictly increasing start times: chain/progression lookups order exposures by startedAt
     const latest = this.state.sessions.reduce((m, x) => Math.max(m, x.startedAt), 0);
@@ -313,12 +328,26 @@ export class Store {
       name: tpl.name,
       templateId,
       status: 'active',
+      ...(tpl.activityType === 'accessory' ? { optionalActivity: true } : {}),
       startedAt: Math.max(Date.now(), latest + 1),
       exercises,
       ...(tpl.warmup?.length ? { warmup: tpl.warmup } : {}),
     };
     this.set({ sessions: [...this.state.sessions, session] });
     put('sessions', session).catch(persistErr);
+    return session.id;
+  }
+
+  async logCardio(minutes: number, activity: string, date = todayISO()): Promise<string> {
+    if (!Number.isFinite(minutes) || minutes < 1 || minutes > 1440) throw new Error('Enter minutes between 1 and 1440.');
+    const now = Date.now();
+    const session: WorkoutSession = {
+      id: newId('ws'), date, name: 'Cardio', templateId: TPL_CARDIO, status: 'completed',
+      startedAt: now - minutes * 60_000, finishedAt: now, exercises: [],
+      cardio: { minutes, activity: activity.trim() || 'Cardio' },
+    };
+    await put('sessions', session);
+    this.set({ sessions: [...this.state.sessions, session] });
     return session.id;
   }
 
@@ -583,13 +612,17 @@ export class Store {
     this.set({ templates: this.state.templates.filter((t) => t.id !== id) });
     for (const plan of this.state.plans) {
       const uses = plan.weeklyGoals.some(
-        (g) => (g.kind === 'rotation' && g.templateIds.includes(id)) || (g.kind === 'workout' && g.templateId === id),
+        (g) => (g.kind === 'rotation' && g.templateIds.includes(id)) || (g.kind === 'workout' && workoutTemplateIds(g).includes(id)),
       );
       if (!uses) continue;
       this.savePlan({
         ...plan,
         weeklyGoals: plan.weeklyGoals
-          .map((g) => (g.kind === 'rotation' ? { ...g, templateIds: g.templateIds.filter((t) => t !== id) } : g))
+          .map((g) => {
+            if (g.kind === 'rotation') return { ...g, templateIds: g.templateIds.filter((t) => t !== id) };
+            const remaining = workoutTemplateIds(g).filter((t) => t !== id);
+            return { ...g, templateId: remaining[0] ?? id, alternativeTemplateIds: remaining.slice(1) };
+          })
           .filter((g) => !(g.kind === 'workout' && g.templateId === id))
           .filter((g) => !(g.kind === 'rotation' && g.templateIds.length === 0)),
       });

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EXERCISE_LIBRARY } from '../src/data/exercises';
 import { PROGRESSIONS, chainLevels } from '../src/data/progressions';
-import { SEED_PLAN, SEED_TEMPLATES, TPL_FLOW, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import { SEED_PLAN, SEED_TEMPLATES } from '../src/data/seedPlan';
+import { TPL_FA, TPL_FB, TPL_ACCESSORY, TPL_CARDIO } from '../src/data/fullBodyPlan';
 import { SUGGESTED_SUBSTITUTES } from '../src/data/substitutions';
 
 const byId = new Map(EXERCISE_LIBRARY.map((e) => [e.id, e]));
@@ -21,7 +22,7 @@ describe('the bundled program', () => {
         else expect(te.repMax).toBeLessThanOrEqual(20);
       }
       // a superset flag never dangles on the last slot
-      expect(t.exercises[t.exercises.length - 1].superset).toBeUndefined();
+      expect(t.exercises[t.exercises.length - 1]?.superset).toBeUndefined();
     }
     for (const g of SEED_PLAN.weeklyGoals) {
       const ids = g.kind === 'rotation' ? g.templateIds : [g.templateId];
@@ -29,32 +30,24 @@ describe('the bundled program', () => {
     }
   });
 
-  it('is an upper/lower rotation with its strength chains trained once or twice a week', () => {
+  it('alternates full-body sessions three times weekly with two shared optional sessions', () => {
     const rot = SEED_PLAN.weeklyGoals.find((g) => g.kind === 'rotation')!;
-    expect(rot.kind === 'rotation' && rot.templateIds).toEqual([TPL_UA, TPL_LA, TPL_UB, TPL_LB]);
-    expect(rot).toMatchObject({ minimum: 3, target: 4, max: 5, minGapHours: 20 });
-    const flow = SEED_PLAN.weeklyGoals.find((g) => g.kind === 'workout')!;
-    expect(flow).toMatchObject({ templateId: TPL_FLOW, optional: true, minimum: 0 });
-
-    const chainExposures = new Map<string, number>();
-    for (const t of SEED_TEMPLATES.filter((t) => t.id !== TPL_FLOW)) {
-      for (const te of t.exercises) {
-        const p = byId.get(te.exerciseId)!.progressionId;
-        if (p) chainExposures.set(p, (chainExposures.get(p) ?? 0) + 1);
-      }
+    expect(rot).toMatchObject({ templateIds: [TPL_FA, TPL_FB], minimum: 3, target: 3, max: 3, restDays: 1 });
+    expect(SEED_PLAN.weeklyGoals[1]).toMatchObject({ templateId: TPL_ACCESSORY, alternativeTemplateIds: [TPL_CARDIO], optional: true, minimum: 0, max: 2 });
+    for (const t of SEED_TEMPLATES.filter((t) => [TPL_FA, TPL_FB].includes(t.id))) {
+      expect(t.exercises).toHaveLength(9);
+      expect(t.exercises.slice(0, 6).every((e) => e.sets === 3)).toBe(true);
+      expect(t.exercises.slice(6).every((e) => e.sets === 2)).toBe(true);
+      expect(t.exercises[1].exerciseId).toMatch(/squat|lunge/);
+      expect(t.exercises[3].exerciseId).toMatch(/deadlift|leg-curl/);
+      expect(t.exercises[4].exerciseId).toBe('band-bent-over-row');
+      expect(t.exercises[5].exerciseId).toBe('push-up');
     }
-    // the strength chains stay in the rotation
-    for (const id of ['pull', 'chin', 'bandrow', 'push', 'dip', 'squat', 'lunge', 'hinge', 'glute', 'calf', 'lsit', 'side']) {
-      expect(chainExposures.get(id), `${id} is trained`).toBeGreaterThanOrEqual(1);
-      expect(chainExposures.get(id), `${id} at most twice`).toBeLessThanOrEqual(2);
-    }
-    // muscle-ups need a bar with clearance, so they stay out of the default program
-    expect(chainExposures.has('muscleup')).toBe(false);
   });
 
   it('a chain trained twice a week uses the same rep range both times (so graduation has one meaning)', () => {
     const ranges = new Map<string, string>();
-    for (const t of SEED_TEMPLATES.filter((t) => t.id !== TPL_FLOW)) {
+    for (const t of SEED_TEMPLATES.filter((t) => [TPL_FA, TPL_FB].includes(t.id))) {
       for (const te of t.exercises) {
         const p = byId.get(te.exerciseId)!.progressionId;
         if (!p) continue;
@@ -65,15 +58,13 @@ describe('the bundled program', () => {
     }
   });
 
-  it('primary pulls and pushes run 5–8 for strength; every session has antagonist pairs and a warm-up', () => {
-    const ua = SEED_TEMPLATES.find((t) => t.id === TPL_UA)!;
-    expect(ua.exercises[0]).toMatchObject({ exerciseId: 'pull-up', sets: 3, repMin: 5, repMax: 8, superset: true });
-    expect(ua.exercises[1]).toMatchObject({ exerciseId: 'push-up', sets: 3, repMin: 5, repMax: 8 });
-    expect(ua.exercises[4]).toMatchObject({ exerciseId: 'band-pull-apart', repMin: 12, repMax: 20 });
-    expect(ua.exercises[5]).toMatchObject({ exerciseId: 'band-curl' });
-    for (const t of SEED_TEMPLATES) {
+  it('pairs the primary movements and provides a warm-up for strength sessions', () => {
+    const a = SEED_TEMPLATES.find((t) => t.id === TPL_FA)!;
+    expect(a.exercises[0]).toMatchObject({ exerciseId: 'pull-up', sets: 3, repMin: 5, repMax: 8, superset: true });
+    expect(a.exercises[1]).toMatchObject({ exerciseId: 'bulgarian-split-squat-bw', sets: 3 });
+    for (const t of SEED_TEMPLATES.filter((t) => t.activityType !== 'cardio')) {
       expect(t.warmup?.length).toBeGreaterThan(0);
-      if (t.id !== TPL_FLOW) expect(t.exercises.some((te) => te.superset)).toBe(true);
+      expect(t.exercises.some((te) => te.superset)).toBe(true);
     }
   });
 

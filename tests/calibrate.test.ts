@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { applyCalibration, DEFAULT_CALIBRATION, startingRungs } from '../src/lib/calibrate';
-import { SEED_TEMPLATES, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import { SPLIT_TEMPLATES as SEED_TEMPLATES, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
 import { EXERCISE_LIBRARY } from '../src/data/exercises';
 
 const slotIds = (tplId: string, templates = SEED_TEMPLATES) => templates.find((t) => t.id === tplId)!.exercises.map((te) => te.exerciseId);

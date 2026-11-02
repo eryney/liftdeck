@@ -133,9 +133,9 @@ describe('csv', () => {
       { id: 'w2', date: '2026-09-02', name: 'Lower A', status: 'active', startedAt: 2, exercises: [{ id: 'e2', exerciseId: 'x', name: 'X', targetSets: 1, repMin: 5, repMax: 8, restSec: 60, increment: 5, suggestedWeight: 0, weight: 0, sets: [{ reps: 8, weight: 0 }] }] },
     ];
     const csv = sessionsToCSV(sessions).split('\n');
-    expect(csv[0]).toBe('date,workout,exercise,chain,rung,set,added_lb,reps,target,result,prescribed,deload');
+    expect(csv[0]).toBe('date,workout,exercise,chain,rung,set,added_lb,reps,target,result,prescribed,deload,cardio_activity,cardio_minutes');
     expect(csv).toHaveLength(4);
-    expect(csv[1]).toBe('2026-09-01,Upper A,Pull-up,pull,4,1,0,5,5,hold,yes,yes');
-    expect(csv[3]).toBe('2026-09-01,Upper A,Pull-up,pull,4,3,0,3,,hold,extra,yes');
+    expect(csv[1]).toBe('2026-09-01,Upper A,Pull-up,pull,4,1,0,5,5,hold,yes,yes,,');
+    expect(csv[3]).toBe('2026-09-01,Upper A,Pull-up,pull,4,3,0,3,,hold,extra,yes,,');
   });
 });

@@ -5,9 +5,10 @@ import { Confirm, Sheet } from '../components/Sheet';
 import { ExercisePicker } from '../components/ExercisePicker';
 import { todayISO } from '../lib/dates';
 import { fmtRange } from '../lib/format';
+import { FULL_BODY_PLAN } from '../data/fullBodyPlan';
 import { newId } from '../lib/ids';
 import { progressionById } from '../data/progressions';
-import { rotationGoal, workoutGoals } from '../lib/flex';
+import { rotationGoal, workoutGoals, workoutTemplateIds } from '../lib/flex';
 import type { TemplateExercise, WeeklyGoal, WorkoutPlan, WorkoutTemplate } from '../types';
 
 export function SettingsScreen() {
@@ -77,8 +78,8 @@ export function SettingsScreen() {
               <div>
                 <div className="bold">{plan.name}</div>
                 <div className="faint tiny">
-                  {rot ? `${rot.minimum}–${rot.max ?? rot.target} sessions a week · target ${rot.target} · ${rot.minGapHours ?? 20} h apart` : 'no rotation'}
-                  {opt ? ` · ${store.templateById(opt.templateId)?.name ?? 'optional'} 0–${opt.max ?? opt.target}` : ''}
+                  {rot ? `${rot.minimum}–${rot.max ?? rot.target} sessions a week · target ${rot.target} · ${rot.restDays ? 'a recovery day between sessions' : `${rot.minGapHours ?? 20} h apart`}` : 'no rotation'}
+                  {opt ? ` · ${opt.alternativeTemplateIds?.length ? 'accessories / cardio' : store.templateById(opt.templateId)?.name ?? 'optional'} 0–${opt.max ?? opt.target}` : ''}
                 </div>
               </div>
               <button className="btn btn--small" onClick={() => setEditingGoals(true)}>Weekly targets</button>
@@ -99,16 +100,17 @@ export function SettingsScreen() {
                 </button>
               );
             })}
-            {opt && store.templateById(opt.templateId) && (
+            {opt && (
               <>
-                <div className="eyebrow mt12">Optional</div>
-                <button className="list-row" onClick={() => setEditingTemplate(opt.templateId)}>
-                  <span className="grow">
-                    <span className="bold">{store.templateById(opt.templateId)?.name}</span>
-                    <span className="faint tiny" style={{ display: 'block' }}>{store.templateById(opt.templateId)?.subtitle}</span>
-                  </span>
-                  <span className="link">Edit</span>
-                </button>
+                <div className="eyebrow mt12">Optional · shared weekly allowance</div>
+                {workoutTemplateIds(opt).map((id) => {
+                  const t = store.templateById(id);
+                  if (!t) return null;
+                  return <button key={id} className="list-row" disabled={t.activityType === 'cardio'} onClick={() => setEditingTemplate(id)}>
+                    <span className="grow"><span className="bold">{t.name}</span><span className="faint tiny" style={{ display: 'block' }}>{t.subtitle}</span></span>
+                    <span className="link">{t.activityType === 'cardio' ? 'Log from Today' : 'Edit'}</span>
+                  </button>;
+                })}
               </>
             )}
             <button className="btn btn--ghost btn--small btn--block mt12" onClick={() => setRestoring(true)}>Restore the default program</button>
@@ -203,7 +205,6 @@ function Stepper({ value, min, max, step = 1, onChange, label }: { value: number
 }
 
 function GoalsEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => void }) {
-  const state = useAppState();
   const rot = rotationGoal(plan);
   const opt = workoutGoals(plan).find((g) => g.optional) ?? null;
   const [name, setName] = useState(plan.name);
@@ -216,9 +217,9 @@ function GoalsEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => void
     if (opt) {
       store.savePlan({ ...plan, weeklyGoals: plan.weeklyGoals.filter((g) => g.id !== opt.id) });
     } else {
-      const flow = state.templates.find((t) => !rot?.templateIds.includes(t.id));
-      if (!flow) return;
-      store.savePlan({ ...plan, weeklyGoals: [...plan.weeklyGoals, { id: newId('goal'), kind: 'workout', templateId: flow.id, minimum: 0, target: 1, max: 2, optional: true }] });
+      const goal = FULL_BODY_PLAN.weeklyGoals.find((g) => g.kind === 'workout');
+      if (!goal) return;
+      store.savePlan({ ...plan, weeklyGoals: [...plan.weeklyGoals, { ...goal, id: newId('goal') }] });
     }
   }
 
@@ -240,7 +241,7 @@ function GoalsEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => void
             <Stepper label="soft max" value={rot.max ?? rot.target} min={rot.target} max={7} onChange={(v) => saveGoal({ ...rot, max: v })} />
           </div>
           <div className="spread mt12">
-            <div><div className="bold small">Hours between sessions</div><div className="faint tiny">upper and lower alternate, so 20 h allows back-to-back days</div></div>
+            <div><div className="bold small">Hours between sessions</div><div className="faint tiny">{rot.restDays ? 'A full recovery day is also kept between strength sessions.' : 'Minimum recovery time before the next strength session.'}</div></div>
             <Stepper label="gap hours" value={rot.minGapHours ?? 20} min={0} max={72} step={4} onChange={(v) => saveGoal({ ...rot, minGapHours: v })} />
           </div>
         </>
@@ -248,8 +249,8 @@ function GoalsEditor({ plan, onClose }: { plan: WorkoutPlan; onClose: () => void
       <div className="hr" />
       <button className="list-row" onClick={toggleOptional}>
         <span className="grow">
-          <span className="bold small">Optional Flow session</span>
-          <span className="faint tiny" style={{ display: 'block' }}>offered on rest days · never affects the week's verdict</span>
+          <span className="bold small">Optional accessories / cardio</span>
+          <span className="faint tiny" style={{ display: 'block' }}>separate from strength · never affects the week's verdict</span>
         </span>
         <span className={`toggle ${opt ? 'on' : ''}`} aria-hidden><i /></span>
       </button>

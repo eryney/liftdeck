@@ -2,12 +2,13 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Store } from '../src/store/store';
 import { bulkPut, closeDB, getDB, loadAll, put } from '../src/lib/db';
-import { BAND_ROWS_MARKER, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES, TPL_LA, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import { BAND_ROWS_MARKER, PLAN_ID, SEED_MARKER, SEED_PLAN, SEED_TEMPLATES, SPLIT_TEMPLATES, TPL_LA, TPL_UA, TPL_UB } from '../src/data/seedPlan';
 import { EXERCISE_LIBRARY } from '../src/data/exercises';
 import { v3Backup } from './backup.test';
 import { buildBackup, parseBackup } from '../src/lib/backup';
 import { detectStall } from '../src/lib/stall';
 import { applyCalibration } from '../src/lib/calibrate';
+import { FULL_BODY_MARKER, TPL_FA, TPL_FB } from '../src/data/fullBodyPlan';
 import { HOME_SETUP_MARKER } from '../src/data/homeSetup';
 import { SCHEMA_VERSION } from '../src/types';
 
@@ -36,6 +37,12 @@ async function seedV3(overrides: { activePlanId?: string | null } = {}) {
 }
 
 const tick = () => new Promise((r) => setTimeout(r, 0));
+// Keep the legacy layout as an explicit fixture for progression-engine regression tests.
+async function initSplitFixture(s: Store) {
+  await s.init();
+  for (const template of SPLIT_TEMPLATES) s.saveTemplate(structuredClone(template));
+  await tick();
+}
 const sessionOf = (s: Store, id: string) => s.state.sessions.find((x) => x.id === id)!;
 
 beforeEach(wipe);
@@ -52,7 +59,7 @@ describe('fresh install', () => {
     expect(s.state.exercises).toHaveLength(EXERCISE_LIBRARY.length);
     expect(s.state.exercises.find((e) => e.id === 'pull-up')).toMatchObject({ progressionId: 'pull', level: 3 });
     expect(s.state.exercises.find((e) => e.id === 'tuck-front-lever')).toMatchObject({ progressionId: 'frontlever', timed: true });
-    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER, HOME_SETUP_MARKER] });
+    expect(s.state.settings).toMatchObject({ schemaVersion: SCHEMA_VERSION, onboarded: false, seedMarkers: [SEED_MARKER, BAND_ROWS_MARKER, HOME_SETUP_MARKER, FULL_BODY_MARKER] });
     const s2 = new Store();
     await s2.init();
     expect(s2.state.plans).toHaveLength(1);
@@ -65,9 +72,9 @@ describe('fresh install', () => {
     const s = new Store();
     await s.init();
     for (const t of applyCalibration(s.state.templates, { pull: '0', push: '0-4', squat: 'squats', bands: false })) s.saveTemplate(t);
-    const id = s.startWorkout(TPL_UA, '2026-09-01');
+    const id = s.startWorkout(TPL_FA, '2026-09-01');
     expect(sessionOf(s, id).exercises[0]).toMatchObject({ exerciseId: 'negative-pull-up', variationBasis: 'start', level: 1 });
-    expect(sessionOf(s, id).exercises[1]).toMatchObject({ exerciseId: 'incline-push-up', level: 0 });
+    expect(sessionOf(s, id).exercises[5]).toMatchObject({ exerciseId: 'incline-push-up', level: 0 });
   });
 });
 
@@ -90,17 +97,17 @@ describe('upgrading a v3 install', () => {
     expect(s.state.settings).toMatchObject({ activePlanId: PLAN_ID, schemaVersion: SCHEMA_VERSION, onboarded: true, startDate: '2026-10-10' });
     expect(s.state.settings.seedMarkers).toContain(SEED_MARKER);
     // the pull-up chain picks up from the old history: 6,5,5 hit the floor targets → 7,6,6 next
-    const id = s.startWorkout(TPL_UA, '2026-10-25');
+    const id = s.startWorkout(TPL_FA, '2026-10-25');
     expect(sessionOf(s, id).exercises[0]).toMatchObject({ exerciseId: 'pull-up', variationBasis: 'hold', targetReps: [7, 6, 6] });
     // the retired rung's exposure is simply not part of the push chain any more
-    expect(sessionOf(s, id).exercises[1]).toMatchObject({ exerciseId: 'push-up', variationBasis: 'start' });
+    expect(sessionOf(s, id).exercises[5]).toMatchObject({ exerciseId: 'push-up', variationBasis: 'start' });
     // second boot: nothing duplicated, nothing re-added
     s.deletePlan(PLAN_ID);
     await tick();
     const s2 = new Store();
     await s2.init();
     expect(s2.state.plans).toHaveLength(0);
-    expect(s2.state.templates.filter((t) => t.id === TPL_UA)).toHaveLength(1);
+    expect(s2.state.templates.filter((t) => t.id === TPL_FA)).toHaveLength(1);
   });
 
   it('a user-made plan stays active; the program is still added', async () => {
@@ -120,14 +127,14 @@ describe('upgrading a v3 install', () => {
     expect(s.state.plans.map((p) => p.id)).toEqual([PLAN_ID]);
     expect(s.state.settings.activePlanId).toBe(PLAN_ID);
     const again = parseBackup(JSON.stringify(buildBackup(s.exportShape())));
-    expect(again.templates.find((t) => t.id === TPL_UA)?.warmup?.length).toBeGreaterThan(0);
+    expect(again.templates.find((t) => t.id === TPL_FA)?.warmup?.length).toBeGreaterThan(0);
   });
 });
 
 describe('sessions are immutable snapshots', () => {
   it('editing a template never rewrites past workouts', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA, '2026-09-01');
     const es = sessionOf(s, id).exercises[0];
     for (let i = 0; i < 3; i++) s.logSet(id, es.id, i, 8);
@@ -144,7 +151,7 @@ describe('sessions are immutable snapshots', () => {
 
   it('finishing early marks incomplete and never triggers a step back; extra sets do not decide', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA, '2026-09-01');
     const [pull, push] = sessionOf(s, id).exercises;
     for (let i = 0; i < 3; i++) s.logSet(id, pull.id, i, 8);
@@ -161,7 +168,7 @@ describe('sessions are immutable snapshots', () => {
 
   it('history edits recompute results and persist', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA, '2026-09-01');
     const es = sessionOf(s, id).exercises[0];
     for (let i = 0; i < 3; i++) s.logSet(id, es.id, i, 8);
@@ -176,7 +183,7 @@ describe('sessions are immutable snapshots', () => {
 describe('progression by variation (chains)', () => {
   it('Upper A starts on the template rungs, pairs antagonists, and carries warm-up + cues', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA, '2026-09-01');
     const ses = sessionOf(s, id);
     expect(ses.warmup?.length).toBeGreaterThan(0);
@@ -195,7 +202,7 @@ describe('progression by variation (chains)', () => {
 
   it('hitting the rep ceiling on every set advances to the next rung; a hold stays; the top rung adds load', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     let id = s.startWorkout(TPL_UA, '2026-09-01');
     let push = sessionOf(s, id).exercises[1];
     for (let i = 0; i < 3; i++) s.logSet(id, push.id, i, 8);
@@ -226,7 +233,7 @@ describe('progression by variation (chains)', () => {
 
   it('two consecutive below-range exposures step back one rung; stepping down by hand sticks', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const below = (date: string) => {
       const id = s.startWorkout(TPL_UA, date);
       const pull = sessionOf(s, id).exercises[0];
@@ -254,7 +261,7 @@ describe('progression by variation (chains)', () => {
 
   it('a locked slot never follows the chain; timed rungs advance in seconds; "replace in plan" targets the slot', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const tpl = s.templateById(TPL_LA)!;
     s.saveTemplate({ ...tpl, exercises: tpl.exercises.map((te, i) => (i === 0 ? { ...te, lockVariation: true } : te)) });
     let id = s.startWorkout(TPL_LA, '2026-09-01');
@@ -278,7 +285,7 @@ describe('progression by variation (chains)', () => {
 describe('exact rep targets', () => {
   it('starts at the floor, climbs +1 per set while targets are hit, resets at the floor on a new rung or load, and previews without side effects', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const pv = s.previewWorkout(TPL_UA);
     expect(pv[0].targetReps).toEqual([5, 5, 5]);
     expect(pv[0].pairGroup).toBe(pv[1].pairGroup);
@@ -316,7 +323,7 @@ describe('exact rep targets', () => {
 describe('stalls and deloads', () => {
   it('three flat sessions flag a stall; a deload resets targets to the floor, never advances, and restarts the climb one above the floor', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const flat = (date: string) => {
       const id = s.startWorkout(TPL_UA, date);
       const pull = sessionOf(s, id).exercises[0];
@@ -354,7 +361,7 @@ describe('stalls and deloads', () => {
 
   it('stepping down a rung is the other way out, and shifting clears a pending deload', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA, '2026-09-01');
     const pull = sessionOf(s, id).exercises[0];
     s.setDeload(id, pull.id, true);
@@ -368,27 +375,27 @@ describe('program edits', () => {
   it('restoring the default program rewrites templates and plan but leaves history alone', async () => {
     const s = new Store();
     await s.init();
-    const id = s.startWorkout(TPL_UA, '2026-09-01');
+    const id = s.startWorkout(TPL_FA, '2026-09-01');
     s.logSet(id, sessionOf(s, id).exercises[0].id, 0, 8);
     s.finishWorkout(id);
-    const tpl = s.templateById(TPL_UA)!;
+    const tpl = s.templateById(TPL_FA)!;
     s.saveTemplate({ ...tpl, name: 'My upper', exercises: tpl.exercises.slice(0, 2) });
     s.savePlan({ ...SEED_PLAN, name: 'Mine', weeklyGoals: SEED_PLAN.weeklyGoals.slice(0, 1) });
     s.restoreDefaultProgram();
     await tick();
-    expect(s.templateById(TPL_UA)).toEqual(SEED_TEMPLATES.find((t) => t.id === TPL_UA));
+    expect(s.templateById(TPL_FA)).toEqual(SEED_TEMPLATES.find((t) => t.id === TPL_FA));
     expect(s.activePlan()).toEqual(SEED_PLAN);
     expect(s.state.sessions).toHaveLength(1);
-    expect((await loadAll()).templates.find((t) => t.id === TPL_UA)?.name).toBe('Upper A');
+    expect((await loadAll()).templates.find((t) => t.id === TPL_FA)?.name).toBe('Full Body A');
   });
 
   it('deleting a template removes it from the rotation; measurements are one per day', async () => {
     const s = new Store();
     await s.init();
     s.completeOnboarding(PLAN_ID);
-    s.deleteTemplate(TPL_UB);
+    s.deleteTemplate(TPL_FB);
     const rot = s.activePlan()!.weeklyGoals.find((g) => g.kind === 'rotation')!;
-    expect(rot.kind === 'rotation' && rot.templateIds).toEqual([TPL_UA, TPL_LA, 'tpl_bs_lower_b']);
+    expect(rot.kind === 'rotation' && rot.templateIds).toEqual([TPL_FA]);
     s.addMeasurement('2026-09-01', 180, 34);
     s.addMeasurement('2026-09-01', 179.5);
     expect(s.state.measurements).toHaveLength(1);
@@ -400,7 +407,7 @@ describe('program edits', () => {
 describe('band rows upgrade and progression', () => {
   it('migrates old row slots once without rewriting history, active sessions, or other programming', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const tpl = s.templateById(TPL_UA)!;
     const legacy = { ...tpl, exercises: tpl.exercises.map((e) => e.exerciseId === 'band-bent-over-row'
       ? { ...e, exerciseId: 'table-row', sets: 4, repMin: 6, repMax: 10, startWeight: 10 } : e) };
@@ -431,7 +438,7 @@ describe('band rows upgrade and progression', () => {
 
   it('advances band-only rungs across both upper days without inventing pound increases', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const expected = ['band-bent-over-row', 'band-row-paused', 'band-row-slow', 'band-row-slow'];
     for (const [i, exerciseId] of expected.entries()) {
       const id = s.startWorkout(i % 2 ? TPL_UB : TPL_UA, `2026-09-0${i + 1}`);
@@ -445,7 +452,7 @@ describe('band rows upgrade and progression', () => {
 
   it('uses band resistance for manual swaps and restores load controls for bodyweight moves', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const id = s.startWorkout(TPL_UA);
     const row = sessionOf(s, id).exercises[3];
     s.substituteExercise(id, row.id, 'band-seated-row', false);
@@ -459,7 +466,7 @@ describe('band rows upgrade and progression', () => {
 describe('upright bar setup migration', () => {
   it('restores old backups through both equipment migrations and keeps logged sets intact', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     const backup = buildBackup(s.exportShape());
     backup.settings.seedMarkers = [SEED_MARKER];
     backup.templates = backup.templates.map((t) => t.id !== TPL_UA ? t : {
@@ -494,7 +501,7 @@ describe('upright bar setup migration', () => {
 
   it('keeps floor core on the floor at the rep ceiling with no automatic load', async () => {
     const s = new Store();
-    await s.init();
+    await initSplitFixture(s);
     for (let i = 0; i < 4; i++) {
       const id = s.startWorkout(TPL_UA);
       const core = sessionOf(s, id).exercises[6];

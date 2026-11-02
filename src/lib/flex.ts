@@ -16,17 +16,22 @@ export function strengthTemplateIds(plan: WorkoutPlan): string[] {
   const ids: string[] = [];
   for (const g of plan.weeklyGoals) {
     if (g.kind === 'rotation') ids.push(...g.templateIds);
-    if (g.kind === 'workout' && !g.optional) ids.push(g.templateId);
+    if (g.kind === 'workout' && !g.optional) ids.push(...workoutTemplateIds(g));
   }
   return ids;
 }
 
+export function workoutTemplateIds(goal: Extract<WeeklyGoal, { kind: 'workout' }>): string[] {
+  return [goal.templateId, ...(goal.alternativeTemplateIds ?? [])];
+}
+
 export function optionalTemplateIds(plan: WorkoutPlan): string[] {
-  return workoutGoals(plan).filter((g) => g.optional).map((g) => g.templateId);
+  return workoutGoals(plan).filter((g) => g.optional).flatMap(workoutTemplateIds);
 }
 
 export function goalLabel(goal: WeeklyGoal, templates: WorkoutTemplate[] = []): string {
   if (goal.kind === 'rotation') return 'Strength';
+  if (goal.alternativeTemplateIds?.length) return 'Accessories / cardio';
   return templates.find((t) => t.id === goal.templateId)?.name ?? (goal.optional ? 'Optional' : 'Workout');
 }
 
@@ -46,7 +51,7 @@ function completedInRange(sessions: WorkoutSession[], from: string, to: string):
 export function goalCount(goal: WeeklyGoal, ctx: Pick<FlexContext, 'sessions'>, from: string, to: string): number {
   const done = completedInRange(ctx.sessions, from, to);
   if (goal.kind === 'rotation') return done.filter((s) => !!s.templateId && goal.templateIds.includes(s.templateId)).length;
-  return done.filter((s) => s.templateId === goal.templateId).length;
+  return done.filter((s) => !!s.templateId && workoutTemplateIds(goal).includes(s.templateId)).length;
 }
 
 export interface GoalAttainment {

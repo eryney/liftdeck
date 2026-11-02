@@ -2,7 +2,9 @@
 
 A bodyweight and resistance-band strength PWA for people with a pull-up bar. All data lives on your phone.
 
-Ships with one program, **Bar Strength**: four ~45-minute sessions a week in a fixed rotation Upper A → Lower A → Upper B → Lower B, plus an optional Flow session. Every exercise sits on a **progression chain** of harder variations (pull-up → archer → typewriter → one-arm). Hit the rep ceiling on every set and the next session serves the next rung. Stall for three sessions and the app offers a deload or a volume block one rung down.
+Ships with **Full Body · 3 days**: alternate A/B/A, then B/A/B the following week. Leave a recovery day between strength sessions. Use up to 2 other sessions for accessories, cardio, or one of each. Strength work takes roughly an hour, depending on rest and exercise variations.
+
+Exercises with progression chains advance when every prescribed set reaches the rep ceiling. Band resistance and floor core progress without automatic pound increases. Three stalled sessions trigger a deload suggestion.
 
 ## Stack
 
@@ -27,7 +29,7 @@ npm test        # unit tests (vitest): chains, prescription, progression, stalls
 npm run e2e     # end-to-end flows in Chromium (playwright; run `npx playwright install chromium` once)
 ```
 
-The e2e suite covers onboarding and calibration, the Today preview, a full Upper A with antagonist pairing and ✓ target logging, chain advance on the next session, a hold session, a three-session stall with deload and the easier-rung exit, manual step up/down, timed holds, resume after reload, program editing, weigh-ins, and offline use.
+The e2e suite covers onboarding and calibration, the Today preview, a complete Full Body A with paired sets and ✓ target logging, chain advance on the next session, a hold session, a three-session stall with deload and the easier-rung exit, manual step up/down, timed holds, resume after reload, program editing, weigh-ins, and offline use.
 
 ## Build + deploy
 
@@ -43,7 +45,7 @@ Open the deployed URL in Safari → Share → **Add to Home Screen**. Storage is
 
 ## Your equipment
 
-Both upper workouts use band bent-over rows, 3×8–15, with the band held under both feet. The band row chain advances to a 2-second pause, then a 4-second return using the same band and grip. At the top, use a stronger band and log the reps you complete. Band resistance never gets automatic pound increases.
+Both full-body workouts use band bent-over rows, 3×8–15, with the band held under both feet. The band row chain advances to a 2-second pause, then a 4-second return using the same band and grip. At the top, use a stronger band and log the reps you complete. Band resistance never gets automatic pound increases.
 
 The exercise picker includes seated band rows, pull-aparts, chest presses, shoulder presses, front squats, Romanian deadlifts, and overhead triceps extensions. These don't need a table or a separate anchor. Anchored exercises list their anchor in the gear notes. Some other program exercises still use chairs, a couch, a wall, or a step.
 
@@ -53,19 +55,20 @@ The default program uses upright bar work, bands, and floor core exercises. Fron
 
 ## The program
 
-| Session | Pairs (alternate sets, rest between) | Sets × reps |
+Adapted from the [r/bodyweightfitness Recommended Routine](https://www.reddit.com/r/bodyweightfitness/wiki/kb/recommended_routine/) for bands, a pull-up bar, and a chair or couch.
+
+| Session | Strength pairs, 3 sets each | Core, 2 sets each |
 |---|---|---|
-| **Upper A** · pull-up + push-up | Pull-up chain ⇄ Push-up chain · Band shoulder press ⇄ Band row chain · Band pull-apart ⇄ Band curl · Dead bug | 3×5–8 · 3×5–8 · 3×8–15 · 3×8–15 · 3×12–20 · 3×8–15 · 3×8–12 per side |
-| **Lower A** · squat + Nordic | Squat chain ⇄ Nordic chain · Cossack squat ⇄ Calf chain · L-sit chain ⇄ Side plank chain | 4×5–8 · 4×5–8 · 3×8–12 · 3×12–20 · 3×15–30 s · 2×20–40 s |
-| **Upper B** · chin-up + dip | Chin-up chain ⇄ Dip chain · Band row chain ⇄ Push-up chain · Floor reverse crunch ⇄ Band shoulder press · Prone Y raise | 3×6–10 · 3×6–10 · 3×8–15 · 3×5–8 · 3×8–12 · 3×8–15 · 2×12–20 |
-| **Lower B** · lunge + hip thrust | Lunge chain ⇄ Hip thrust chain · Nordic chain ⇄ Calf chain · Dead bug ⇄ Arch raise | 4×8–12 · 4×10–15 · 3×5–8 · 3×12–20 · 3×8–12 · 2×12–15 |
-| **Flow** (optional, 0–2/wk) | Bear crawl, monkey, frogger, deep squat hold, dead hang, forearm plank | 3×30–45 s for locomotion; plank 3×15–30 s |
+| Full Body A | Pull-up + split squat; band shoulder press + band Romanian deadlift; band row + push-up | Dead bug, side plank, arch raise |
+| Full Body B | Chin-up + reverse lunge; chair dip + sliding leg curl; band row + push-up | Floor reverse crunch, side plank, arch raise |
+| Accessories (optional) | 2 sets each: band curls, triceps extensions, lateral raises, pull-aparts, single-leg glute bridges and calf raises | |
+| Cardio (optional) | Log completed minutes for a walk, run, cycle, swim or other cardio | |
 
-Weekly goal: minimum 3, target 4, soft max 5, sessions at least 20 h apart (upper and lower alternate, so back-to-back days are fine). Every muscle gets two exposures and 12–18 hard sets a week. Rest is 90 s between paired primaries, 60–75 s elsewhere, which works out to ~3 min per muscle.
+Example week: strength Monday, Wednesday and Friday; optional sessions Tuesday and Thursday. The strength target and cap are both 3. Accessories and cardio share a separate cap of 2 sessions. Optional sessions don't advance the strength rotation or restart its recovery clock.
 
-**Chains** (19 of them): pull-up, chin-up, muscle-up (library only, needs a bar with clearance), table row (optional), band row, front lever, planche, push-up, handstand push-up, dip, squat, lunge, Nordic, hip thrust, calf, hanging core, L-sit, side plank, dragon flag. Each ends with a "top of chain" note (backpack load, pauses, slower lowering).
+The app recommends a full recovery day between strength sessions, plus at least 24 hours since the previous session finished. Paired strength sets have 90 seconds of rest between exercises; core and accessories use 60 seconds. Starting variations depend on calibration and recorded progress.
 
-**Why these numbers.** Strength is best served by hard sets of ~5–8 on the primary movements, while hypertrophy is similar from ~6 to 30 reps when sets end near failure (Schoenfeld 2017, 2021; Lopez 2021). 10–20 weekly hard sets per muscle, twice a week, is the productive range for trained people (Schoenfeld 2016, 2017; Baz-Valle 2022). Closer to failure grows more (Refalo 2023; Robinson 2024), so every set has an exact target one rep above last time. 2–3 min rest beats 1 min for both strength and size (Schoenfeld 2016); antagonist supersets give each muscle that rest while the session stays short (Weakley 2017; Coleman 2024). Chain order and graduation rules follow the r/bodyweightfitness Recommended Routine and *Overcoming Gravity*.
+Existing installs switch once to this plan. The old split templates are archived, completed and active workouts stay intact, and calibrated starting variations carry over. Cardio minutes appear in History, JSON backups and CSV exports.
 
 ## How the logic works
 
@@ -77,7 +80,7 @@ Weekly goal: minimum 3, target 4, soft max 5, sessions at least 20 h apart (uppe
 
 **Stalls and deloads** (`src/lib/stall.ts`). Three consecutive complete sessions on the same rung and load with no net gain in total prescribed reps flag a stall. The session card offers two exits: **Deload today** (every target drops to the floor, the exposure can never advance the chain, and the climb restarts one above the floor next time) or **Easier rung** (the previous variation for a block of volume). A deload also resets the stall window.
 
-**Antagonist pairs.** A slot flagged `superset` shares a pair group with the slot after it. After every logged set the workout screen jumps to the partner with the fewest logged sets.
+**Paired sets.** A slot flagged `superset` shares a pair group with the slot after it. After every logged set the workout screen jumps to the partner with the fewest logged sets.
 
 **Weekly goals** (`src/lib/flex.ts`, `src/lib/recommend.ts`). Weeks are Mon–Sun and judged on totals. The rotation is driven by the most recently completed rotation session and never resets on Monday. The recommendation is a fixed rule list: next session if below target and rested → rest otherwise (the next session is still one tap away) → a bonus session up to the soft max → rest. Nothing is ever blocked.
 
@@ -87,7 +90,8 @@ Weekly goal: minimum 3, target 4, soft max 5, sessions at least 20 h apart (uppe
 
 - `src/data/exercises.ts` — the library: every chain in order, with cues and household gear notes.
 - `src/data/progressions.ts` — chain names, patterns, and what to do at the top of each.
-- `src/data/seedPlan.ts` — the Bar Strength templates + plan.
+- `src/data/seedPlan.ts` — legacy split templates and exports of the current defaults.
+- `src/data/fullBodyPlan.ts`: full-body A/B, accessories, cardio, weekly goals and migration helpers.
 - `src/lib/variation.ts` — which rung today, and why. `src/lib/prescribe.ts` — exact per-set targets. `src/lib/stall.ts` — stall detection.
 - `src/lib/calibrate.ts` — onboarding answers → starting rungs.
 - `src/store/store.ts` — in-memory state with write-through persistence to IndexedDB; every logged set is saved immediately. Upgrades older installs in place (library resync, legacy plan swap); session records are snapshots and never rewritten.

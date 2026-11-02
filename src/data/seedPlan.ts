@@ -1,7 +1,7 @@
 import { EXERCISE_LIBRARY } from './exercises';
 import type { TemplateExercise, WorkoutPlan, WorkoutTemplate } from '../types';
 
-// ── BAR STRENGTH · the default program ──────────────────────────────────────────────────────────
+// ── BAR STRENGTH · legacy split (retained for upgrades and regression fixtures) ──────────────────────────────────────────────────────────
 //
 // Bodyweight and bands: a pull-up bar, the floor, a wall, bands, and a couple of chairs. Four ~45-minute
 // sessions a week in a fixed rotation UPPER A → LOWER A → UPPER B → LOWER B, so every muscle is trained
@@ -73,7 +73,7 @@ const LOWER_WARMUP = [
 ];
 
 // exerciseId, sets, repMin, repMax, restSec, flags
-export const SEED_TEMPLATES: WorkoutTemplate[] = [
+export const SPLIT_TEMPLATES: WorkoutTemplate[] = [
   {
     id: TPL_UA,
     name: 'Upper A',
@@ -148,7 +148,7 @@ export const SEED_TEMPLATES: WorkoutTemplate[] = [
   },
 ];
 
-export const SEED_PLAN: WorkoutPlan = {
+export const SPLIT_PLAN: WorkoutPlan = {
   id: PLAN_ID,
   name: 'Bar Strength',
   mode: 'flex',
@@ -159,3 +159,5 @@ export const SEED_PLAN: WorkoutPlan = {
     { id: 'goal_flow', kind: 'workout', templateId: TPL_FLOW, minimum: 0, target: 1, max: 2, optional: true },
   ],
 };
+
+export { FULL_BODY_TEMPLATES as SEED_TEMPLATES, FULL_BODY_PLAN as SEED_PLAN } from './fullBodyPlan';

@@ -1,5 +1,5 @@
 import type { WorkoutPlan, WorkoutSession, WorkoutTemplate } from '../types';
-import { hoursBetween, todayISO } from './dates';
+import { addDays, hoursBetween, todayISO } from './dates';
 import { nextRotationTemplateId, optionalTemplateIds, rotationGoal, strengthTemplateIds, weekAttainment, workoutGoals } from './flex';
 
 /**
@@ -8,7 +8,7 @@ import { nextRotationTemplateId, optionalTemplateIds, rotationGoal, strengthTemp
  *   2. strength below target, not rested         → rest (the next session is still one tap away)
  *   3. strength at target but below the soft max → next session offered as a bonus, if you feel good
  *   4. otherwise                                 → recovery
- * The optional session (Flow) is offered whenever strength is not the call today. Nothing is ever blocked.
+ * An optional session is offered whenever strength is not the call today. Nothing is ever blocked.
  */
 
 export const DEFAULT_MIN_GAP_HOURS = 20;
@@ -50,7 +50,7 @@ export function lastStrengthSession(plan: WorkoutPlan, sessions: WorkoutSession[
   const optional = optionalTemplateIds(plan);
   let best: WorkoutSession | null = null;
   for (const s of sessions) {
-    if (s.status !== 'completed') continue;
+    if (s.status !== 'completed' || s.cardio || s.optionalActivity) continue;
     // any completed non-optional session counts as a strength exposure for recovery spacing
     const isStrength = s.templateId ? ids.includes(s.templateId) || !optional.includes(s.templateId) : true;
     if (!isStrength) continue;
@@ -77,10 +77,11 @@ export function recommend(input: RecommendInput): Recommendation {
 
   const lastStrength = lastStrengthSession(plan, sessions);
   const hoursSinceLast = lastStrength ? hoursBetween(lastStrength.finishedAt ?? lastStrength.startedAt, now) : null;
-  const gapOk = hoursSinceLast == null || hoursSinceLast >= minGapHours;
+  const calendarRestOk = !lastStrength || !rg?.restDays || today >= addDays(lastStrength.date, rg.restDays + 1);
+  const gapOk = calendarRestOk && (hoursSinceLast == null || hoursSinceLast >= minGapHours);
   const nextTemplateId = rg ? nextRotationTemplateId(rg, sessions) : null;
   const strengthAtMax = strengthMax != null && strengthCount >= strengthMax;
-  const strengthToday = sessions.some((s) => s.date === today && s.status === 'completed' && (!s.templateId || !optionalTemplateIds(plan).includes(s.templateId)));
+  const strengthToday = sessions.some((s) => s.date === today && s.status === 'completed' && !s.cardio && !s.optionalActivity && (!s.templateId || !optionalTemplateIds(plan).includes(s.templateId)));
 
   const accCount = optGoal ? week.goals.find((g) => g.goal.id === optGoal.id)?.count ?? 0 : 0;
   const accMax = optGoal?.max ?? null;
@@ -98,13 +99,14 @@ export function recommend(input: RecommendInput): Recommendation {
     };
   } else if (rg && nextTemplateId && strengthWanted && !gapOk) {
     const h = Math.max(1, Math.ceil(minGapHours - (hoursSinceLast ?? 0)));
-    primary = { kind: 'rest', reason: strengthToday ? 'Done for today' : `Rest · next session in about ${h} h` };
+    primary = { kind: 'rest', reason: strengthToday ? 'Done for today' : !calendarRestOk ? 'Recovery day · leave a day between full-body sessions' : `Rest · next session in about ${h} h` };
   } else if (rg && nextTemplateId && strengthCount >= strengthTarget && !strengthAtMax && gapOk) {
-    primary = { kind: 'bonus', templateId: nextTemplateId, reason: `Week's target met · a 5th session is fine if you feel fresh` };
+    primary = { kind: 'bonus', templateId: nextTemplateId, reason: `Week's target met · an extra session is optional if you feel fresh` };
   } else {
     primary = { kind: 'rest', reason: week.target ? 'Week complete' : strengthAtMax ? 'Soft max reached · rest' : 'Rest' };
   }
-  if (!gapOk && !strengthToday) notes.push(`Last session was ${Math.round(hoursSinceLast ?? 0)} h ago · the plan asks for ${minGapHours} h between sessions`);
+  if (!calendarRestOk && !strengthToday) notes.push('Accessories or cardio are optional today. Keep enough energy for your next strength session.');
+  if (calendarRestOk && !gapOk && !strengthToday) notes.push(`Last session was ${Math.round(hoursSinceLast ?? 0)} h ago · the plan asks for ${minGapHours} h between sessions`);
 
   return {
     primary,

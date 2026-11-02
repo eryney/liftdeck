@@ -78,7 +78,7 @@ export function HistoryScreen() {
                 <span>{parseISO(c.date).getDate()}</span>
                 <span className="row" style={{ gap: 2, minHeight: 6 }}>
                   {sessions.map((s) => (
-                    <i key={s.id} className={s.templateId && optional.includes(s.templateId) ? 'opt' : ''} />
+                    <i key={s.id} className={s.cardio || s.optionalActivity || (s.templateId && optional.includes(s.templateId)) ? 'opt' : ''} />
                   ))}
                 </span>
               </button>
@@ -106,6 +106,7 @@ function DaySheet({ date, sessions, onClose }: { date: string; sessions: Workout
             <div className="bold">{s.name}</div>
             <button className="link red" onClick={() => setDeleting(s.id)}>Delete</button>
           </div>
+          {s.cardio && <div className="muted small mt8">{s.cardio.activity} · {s.cardio.minutes} min</div>}
           {s.exercises
             .filter((es) => es.sets.some((x) => x.reps != null))
             .map((es) => {

@@ -83,7 +83,7 @@ export function Onboarding({ onDone }: { onDone: () => void }) {
       <div className="eyebrow">Liftdeck</div>
       <h1 className="title" style={{ fontSize: 34 }}>Get strong on a pull-up bar.</h1>
       <p className="muted" style={{ margin: '8px 0 0', lineHeight: 1.5 }}>
-        Pull-up bar and resistance bands, with a wall and sturdy chairs for some movements. Rows use a band under your feet; core work comes off the bar. Four sessions a week, about 45 minutes each.
+        Pull-up bar and resistance bands, with a wall and sturdy chairs for some movements. Rows use a band under your feet; core work comes off the bar. Three full-body sessions a week, roughly an hour each. Accessories or cardio fit on up to 2 other days.
       </p>
 
       <div className="card mt24">

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { dayRecord, foundationStreak, goalCount, nextRotationTemplateId, optionalTemplateIds, strengthTemplateIds, targetWeeks, weekAttainment } from '../src/lib/flex';
-import { SEED_PLAN, TPL_FLOW, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
+import { SPLIT_PLAN as SEED_PLAN, TPL_FLOW, TPL_LA, TPL_LB, TPL_UA, TPL_UB } from '../src/data/seedPlan';
 import type { WorkoutSession } from '../src/types';
 
 let n = 0;

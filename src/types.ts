@@ -54,6 +54,8 @@ export interface TemplateExercise {
 
 export interface WorkoutTemplate {
   id: string;
+  archived?: boolean;
+  activityType?: 'cardio' | 'accessory';
   name: string;
   /** e.g. "Pull-up + push-up" — shown under the name */
   subtitle?: string;
@@ -73,11 +75,15 @@ export type WeeklyGoal =
       max?: number;
       /** suggested spacing between sessions of this rotation */
       minGapHours?: number;
+      /** Whole calendar recovery days between strength sessions. */
+      restDays?: number;
     }
   | {
       id: string;
       kind: 'workout';
       templateId: string;
+      /** Alternative sessions share this weekly allowance. */
+      alternativeTemplateIds?: string[];
       minimum: number;
       target: number;
       max?: number;
@@ -167,6 +173,8 @@ export interface ExerciseSession {
 }
 
 export interface WorkoutSession {
+  /** Preserve optional-session classification when the plan changes. */
+  optionalActivity?: boolean;
   id: string;
   date: string; // YYYY-MM-DD local
   name: string;
@@ -176,6 +184,7 @@ export interface WorkoutSession {
   finishedAt?: number;
   exercises: ExerciseSession[];
   warmup?: string[];
+  cardio?: { minutes: number; activity: string };
 }
 
 export interface BodyMeasurement {

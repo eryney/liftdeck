@@ -44,17 +44,18 @@ function csvEscape(v: unknown): string {
 }
 
 export function sessionsToCSV(sessions: BackupFile['sessions']): string {
-  const rows: string[] = ['date,workout,exercise,chain,rung,set,added_lb,reps,target,result,prescribed,deload'];
+  const rows: string[] = ['date,workout,exercise,chain,rung,set,added_lb,reps,target,result,prescribed,deload,cardio_activity,cardio_minutes'];
   const sorted = [...sessions].sort((a, b) => a.startedAt - b.startedAt);
   for (const s of sorted) {
     if (s.status !== 'completed') continue;
+    if (s.cardio) rows.push([s.date, s.name, '', '', '', '', '', '', '', '', '', '', s.cardio.activity, s.cardio.minutes].map(csvEscape).join(','));
     for (const es of s.exercises) {
       es.sets.forEach((set, i) => {
         if (set.reps == null) return;
         rows.push(
           [
             s.date, s.name, es.name, es.progressionId ?? '', es.level != null ? es.level + 1 : '', i + 1, set.weight, set.reps,
-            es.targetReps?.[i] ?? '', es.result ?? '', i < es.targetSets ? 'yes' : 'extra', es.deload ? 'yes' : '',
+            es.targetReps?.[i] ?? '', es.result ?? '', i < es.targetSets ? 'yes' : 'extra', es.deload ? 'yes' : '', '', '',
           ].map(csvEscape).join(','),
         );
       });
