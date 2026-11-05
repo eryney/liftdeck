@@ -902,3 +902,27 @@ h2.section {
 @media (min-width: 600px) {
   .screen { padding-left: 24px; padding-right: 24px; }
 }
+
+/* Exercise reference cards stay local, readable at phone size, and motion-free. */
+.exercise-guide { margin: 12px 0; border: 1px solid var(--line); border-radius: 14px; background: #111b23; overflow: hidden; }
+.exercise-guide__frames { display: grid; grid-template-columns: 1fr 1fr; }
+.exercise-guide__frame { min-width: 0; padding: 8px 4px 10px; }
+.exercise-guide__frame + .exercise-guide__frame { border-left: 1px solid #293b49; }
+.exercise-guide__frame svg { width: 100%; height: auto; display: block; }
+.exercise-guide__caption { display: flex; align-items: baseline; gap: 5px; padding: 0 5px; font-size: 10px; line-height: 1.4; color: #c4d3dd; }
+.exercise-guide__caption span { font-weight: 800; color: #78bdec; }
+.exercise-guide__muscles { display: flex; align-items: center; gap: 12px; border-top: 1px solid #293b49; padding: 8px 12px; }
+.muscle-map { width: 108px; flex: 0 0 108px; height: 94px; }
+.muscle-map text { font-size: 9px; fill: #a2b3c0; }
+.guide-main, .guide-support { font-size: 10px; font-weight: 700; margin-bottom: 2px; }
+.guide-main { color: #f28e68; }
+.guide-support { color: #72b9e7; }
+.guide-dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: currentColor; margin-right: 5px; }
+.exercise-guide__cue { border-top: 1px solid #293b49; padding: 12px; margin: 0; color: #b7c8d5; line-height: 1.6; }
+.workout-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.workout-outline { padding: 12px; }
+.workout-outline summary { display: flex; align-items: center; gap: 10px; cursor: pointer; list-style: none; }
+.workout-outline summary::-webkit-details-marker { display: none; }
+.workout-outline__number { color: var(--faint); font-size: 12px; min-width: 16px; }
+.workout-outline[open] summary .link { color: var(--muted); }
+.wake-status { margin-top: 12px; display: block; }

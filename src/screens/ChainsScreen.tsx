@@ -1,3 +1,4 @@
+import { ExerciseGuide } from '../components/ExerciseGuide';
 import { useMemo, useState } from 'react';
 import { store, useAppState } from '../store/store';
 import { PROGRESSIONS, chainLevels, progressionById } from '../data/progressions';
@@ -157,6 +158,7 @@ function ChainDetail({ c, onBack }: { c: ChainStatus; onBack: () => void }) {
                   {r.timed && <span className="faint tiny"> · hold</span>}
                   {r.perSide && <span className="faint tiny"> · per side</span>}
                 </div>
+                <details className="rung-guide mt8"><summary className="link tiny">Exercise guide</summary><ExerciseGuide exerciseId={r.id} showCue /></details>
                 {r.gear && <div className="rung__meta">Needs: {r.gear}</div>}
                 {h.length > 0 && (
                   <div className="rung__meta">

@@ -206,6 +206,7 @@ export interface AppSettings {
   maWindowDays: number;
   soundOn: boolean;
   vibrateOn: boolean;
+  keepAwake: boolean;
   /** one-time seed/migration markers so bundled plans are added exactly once */
   seedMarkers?: string[];
 }

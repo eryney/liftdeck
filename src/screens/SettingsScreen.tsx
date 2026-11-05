@@ -1,3 +1,5 @@
+import { wakeStatusText } from '../lib/wakeLock';
+import type { WakeStatus } from '../lib/wakeLock';
 import { useRef, useState } from 'react';
 import { store, useAppState } from '../store/store';
 import { buildBackup, downloadFile, measurementsToCSV, parseBackup, sessionsToCSV } from '../lib/backup';
@@ -11,7 +13,7 @@ import { progressionById } from '../data/progressions';
 import { rotationGoal, workoutGoals, workoutTemplateIds } from '../lib/flex';
 import type { TemplateExercise, WeeklyGoal, WorkoutPlan, WorkoutTemplate } from '../types';
 
-export function SettingsScreen() {
+export function SettingsScreen({ wakeStatus, onRetryWake }: { wakeStatus: WakeStatus; onRetryWake: () => void }) {
   const state = useAppState();
   const s = state.settings;
   const plan = store.activePlan();
@@ -30,7 +32,7 @@ export function SettingsScreen() {
     if (tpl) return <TemplateEditor template={tpl} onBack={() => setEditingTemplate(null)} />;
   }
 
-  function toggle(key: 'soundOn' | 'vibrateOn') {
+  function toggle(key: 'soundOn' | 'vibrateOn' | 'keepAwake') {
     store.updateSettings({ [key]: !s[key] });
   }
 
@@ -120,6 +122,12 @@ export function SettingsScreen() {
 
       <h2 className="section">Session</h2>
       <div className="card" style={{ paddingTop: 4, paddingBottom: 4 }}>
+        <button className="list-row" role="switch" aria-checked={s.keepAwake} aria-label="Keep screen awake" onClick={() => toggle('keepAwake')}>
+          <span className="grow">Keep screen awake<span className="faint tiny" style={{ display: 'block' }}>While LIFTDECK is open and visible</span></span>
+          <span className={`toggle ${s.keepAwake ? 'on' : ''}`} aria-hidden><i /></span>
+        </button>
+        <div className="faint tiny mt8" data-testid="wake-status">{wakeStatusText[wakeStatus]}</div>
+        {s.keepAwake && ['paused', 'unavailable'].includes(wakeStatus) && <button className="link mt8" onClick={onRetryWake}>Retry screen lock</button>}
         <button className="list-row" onClick={() => toggle('soundOn')}>
           <span className="grow">Timer sound</span>
           <span className={`toggle ${s.soundOn ? 'on' : ''}`} aria-hidden><i /></span>

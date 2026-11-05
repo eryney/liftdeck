@@ -4,7 +4,7 @@ A bodyweight and resistance-band strength PWA for people with a pull-up bar. All
 
 Ships with **Full Body · 3 days**: alternate A/B/A, then B/A/B the following week. Leave a recovery day between strength sessions. Use up to 2 other sessions for accessories, cardio, or one of each. Strength work takes roughly an hour, depending on rest and exercise variations.
 
-Exercises with progression chains advance when every prescribed set reaches the rep ceiling. Band resistance and floor core progress without automatic pound increases. Three stalled sessions trigger a deload suggestion.
+Exercises with progression chains advance when every prescribed set reaches the rep ceiling. Band resistance, dead bugs and floor reverse crunches progress without automatic pound increases. Three stalled sessions trigger a deload suggestion.
 
 ## Stack
 
@@ -29,7 +29,7 @@ npm test        # unit tests (vitest): chains, prescription, progression, stalls
 npm run e2e     # end-to-end flows in Chromium (playwright; run `npx playwright install chromium` once)
 ```
 
-The e2e suite covers onboarding and calibration, the Today preview, a complete Full Body A with paired sets and ✓ target logging, chain advance on the next session, a hold session, a three-session stall with deload and the easier-rung exit, manual step up/down, timed holds, resume after reload, program editing, weigh-ins, and offline use.
+The e2e suite also checks screen-awake settings, visibility changes, complete workout browsing, and offline exercise guides. It covers onboarding and calibration, the Today preview, a complete Full Body A with paired sets and ✓ target logging, chain advance on the next session, a hold session, a three-session stall with deload and the easier-rung exit, manual step up/down, timed holds, resume after reload, program editing, weigh-ins, and offline use.
 
 ## Build + deploy
 
@@ -69,6 +69,16 @@ Example week: strength Monday, Wednesday and Friday; optional sessions Tuesday a
 The app recommends a full recovery day between strength sessions, plus at least 24 hours since the previous session finished. Paired strength sets have 90 seconds of rest between exercises; core and accessories use 60 seconds. Starting variations depend on calibration and recorded progress.
 
 Existing installs switch once to this plan. The old split templates are archived, completed and active workouts stay intact, and calibrated starting variations carry over. Cardio minutes appear in History, JSON backups and CSV exports.
+
+## Screen awake and exercise guides
+
+**Keep screen awake** defaults on in Settings. LIFTDECK requests the browser's screen wake lock while the app is open and visible, releases it when hidden, and requests it again on return. The current status appears in Settings and during workouts. Unsupported browsers and power-saving restrictions are shown honestly; the app can't override the operating system. See the [Screen Wake Lock API documentation](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API).
+
+**Workouts** shows every exercise, set count, rep range, rest period, warm-up and current progression for Full Body A, B and Accessories. Expand an exercise to see its guide. Cardio is available there too.
+
+Each bundled exercise has 2 schematic key positions, setup cues and a front/back muscle map. Orange marks primary muscles; blue marks supporting muscles. The original SVG drawings are included in the app bundle and work offline. Guides follow the selected variation during workouts and are available for each rung in Chains. They show positioning reminders, not measured muscle activation. Custom exercises don't receive a generic illustration.
+
+Targets remain inside each exercise's prescribed range. Every prescribed set must reach its ceiling before a chain advances. The next variation starts at its floor when first attempted; a previously trained variation can reuse its saved targets. At the final rung, band and rep-only targets remain capped, while an added-load increase resets rep targets to the floor. Incomplete sessions, deloads and bonus sets don't trigger advancement.
 
 ## How the logic works
 

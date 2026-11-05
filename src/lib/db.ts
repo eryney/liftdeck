@@ -63,6 +63,7 @@ export function defaultSettings(): AppSettings {
     maWindowDays: 7,
     soundOn: true,
     vibrateOn: true,
+    keepAwake: true,
     seedMarkers: [],
   };
 }

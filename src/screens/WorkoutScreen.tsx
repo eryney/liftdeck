@@ -1,3 +1,6 @@
+import { wakeStatusText } from '../lib/wakeLock';
+import type { WakeStatus } from '../lib/wakeLock';
+import { ExerciseGuide } from '../components/ExerciseGuide';
 import { useEffect, useMemo, useState } from 'react';
 import { store, useAppState } from '../store/store';
 import type { ExerciseSession, WorkoutSession } from '../types';
@@ -46,7 +49,7 @@ function nextInPair(session: WorkoutSession, idx: number): number | null {
   return loggedCountOf(members[0].e) <= mine ? members[0].i : null;
 }
 
-export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit: () => void }) {
+export function WorkoutScreen({ sessionId, onExit, wakeStatus, onRetryWake }: { sessionId: string; onExit: () => void; wakeStatus: WakeStatus; onRetryWake: () => void }) {
   const state = useAppState();
   const session = state.sessions.find((s) => s.id === sessionId);
   const [idx, setIdx] = useState(() => {
@@ -215,7 +218,9 @@ export function WorkoutScreen({ sessionId, onExit }: { sessionId: string; onExit
         </div>
       ) : null}
 
+      <button className={`wake-status tiny ${wakeStatus === 'active' ? 'green' : 'faint'}`} onClick={onRetryWake} data-testid="wake-status">{wakeStatusText[wakeStatus]}</button>
       <h2 className="ex-name">{es.name}</h2>
+      {!es.skippedReason && <ExerciseGuide exerciseId={es.exerciseId} /> }
       {es.substitutedFor && <div className="accent tiny mt4">Swapped in for {es.substitutedFor}</div>}
 
       {/* ── chain position ── */}

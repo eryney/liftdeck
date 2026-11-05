@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useScreenAwake } from './hooks/useScreenAwake';
+import { WorkoutsScreen } from './screens/WorkoutsScreen';
 import { store, useAppState } from './store/store';
 import { TodayScreen } from './screens/TodayScreen';
 import { WorkoutScreen } from './screens/WorkoutScreen';
@@ -7,12 +9,13 @@ import { HistoryScreen } from './screens/HistoryScreen';
 import { SettingsScreen } from './screens/SettingsScreen';
 import { Onboarding } from './screens/Onboarding';
 import { RestTimerBar } from './components/RestTimerBar';
-import { IconChains, IconHistory, IconSettings, IconToday } from './components/Icons';
+import { IconWorkouts, IconChains, IconHistory, IconSettings, IconToday } from './components/Icons';
 
-type Tab = 'today' | 'chains' | 'history' | 'settings';
+type Tab = 'today' | 'workouts' | 'chains' | 'history' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: () => JSX.Element }[] = [
   { id: 'today', label: 'Today', icon: IconToday },
+  { id: 'workouts', label: 'Workouts', icon: IconWorkouts },
   { id: 'chains', label: 'Chains', icon: IconChains },
   { id: 'history', label: 'History', icon: IconHistory },
   { id: 'settings', label: 'Settings', icon: IconSettings },
@@ -20,6 +23,7 @@ const TABS: { id: Tab; label: string; icon: () => JSX.Element }[] = [
 
 export default function App() {
   const state = useAppState();
+  const awake = useScreenAwake(state.ready && state.settings.keepAwake);
   const [tab, setTab] = useState<Tab>('today');
   const [workoutId, setWorkoutId] = useState<string | null>(null);
 
@@ -42,7 +46,7 @@ export default function App() {
   if (workoutId) {
     return (
       <>
-        <WorkoutScreen sessionId={workoutId} onExit={() => setWorkoutId(null)} />
+        <WorkoutScreen wakeStatus={awake.status} onRetryWake={awake.retry} sessionId={workoutId} onExit={() => setWorkoutId(null)} />
         {state.restTimer && <RestTimerBar timer={state.restTimer} solo />}
       </>
     );
@@ -51,9 +55,10 @@ export default function App() {
   return (
     <>
       {tab === 'today' && <TodayScreen onOpenWorkout={setWorkoutId} />}
+      {tab === 'workouts' && <WorkoutsScreen onOpenWorkout={setWorkoutId} />}
       {tab === 'chains' && <ChainsScreen />}
       {tab === 'history' && <HistoryScreen />}
-      {tab === 'settings' && <SettingsScreen />}
+      {tab === 'settings' && <SettingsScreen wakeStatus={awake.status} onRetryWake={awake.retry} />}
 
       {state.restTimer && <RestTimerBar timer={state.restTimer} />}
 

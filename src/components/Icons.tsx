@@ -36,3 +36,10 @@ export const IconSettings = () => (
     <circle cx="8" cy="17" r="2" fill="var(--bg)" />
   </svg>
 );
+
+export const IconWorkouts = () => (
+  <svg viewBox="0 0 24 24" {...p}>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M9 3h6v3H9zM9 11h6M9 15h6" />
+  </svg>
+);

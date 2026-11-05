@@ -404,3 +404,70 @@ test('an old active lever keeps its logged set and queues band work for the rema
   await expect(page.locator('.complete-card')).toContainText('logged before setup update');
   await expect(page.locator('.complete-card')).not.toContainText('next:');
 });
+
+test('Workouts shows each complete session with offline exercise guides and current variations', async ({ page, context }) => {
+  await boot(page); await onboard(page);
+  await tab(page,'Workouts').click();
+  await expect(page.getByRole('heading',{ name:'Workouts',exact:true })).toBeVisible();
+  await expect(page.locator('.workout-outline')).toHaveCount(9);
+  await expect(page.getByText('24 work sets.',{ exact:false })).toBeVisible();
+  const first = page.locator('.workout-outline').first();
+  await first.locator('summary').click();
+  await expect(first.getByTestId('exercise-guide')).toHaveAttribute('data-exercise','pull-up');
+  await expect(first.locator('.exercise-guide__frames svg')).toHaveCount(2);
+  await expect(first).toContainText('Lats');
+  await first.getByTestId('exercise-guide').screenshot({ path:'test-results/guide-pull-up.png' });
+  for (const [index,name] of [[1,'split-squat'],[3,'band-hinge'],[4,'band-row'],[6,'dead-bug'],[7,'side-plank']] as const) {
+    const row = page.locator('.workout-outline').nth(index);
+    await row.locator('summary').click();
+    await row.getByTestId('exercise-guide').screenshot({ path:`test-results/guide-${name}.png` });
+  }
+  await page.getByRole('button',{name:'Full Body B',exact:true}).click();
+  await expect(page.locator('.workout-outline')).toHaveCount(9);
+  await expect(page.locator('.workout-outline').first()).toContainText('Chin-up');
+  await expect(page.locator('.workout-outline').nth(3)).toContainText('Sliding leg curl');
+  await page.getByRole('button',{name:'Accessories',exact:true}).click();
+  await expect(page.locator('.workout-outline')).toHaveCount(6);
+  await page.getByRole('button',{name:'Cardio',exact:true}).click();
+  await expect(page.getByRole('button',{name:'Log cardio',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Full Body A',exact:true}).click();
+  await page.screenshot({path:'test-results/workouts-tab-mobile.png',fullPage:true});
+  await page.waitForTimeout(1200);
+  await context.setOffline(true); await page.reload(); await tab(page,'Workouts').click();
+  await page.locator('.workout-outline').first().locator('summary').click();
+  await expect(page.locator('.workout-outline').first().getByTestId('exercise-guide')).toBeVisible();
+  await context.setOffline(false);
+  await page.getByRole('button',{name:'Start Full Body A',exact:true}).click();
+  await expect(page.getByTestId('exercise-guide')).toHaveAttribute('data-exercise','pull-up');
+  await page.getByRole('button',{name:'↑ Harder'}).click();
+  await expect(page.getByTestId('exercise-guide')).toHaveAttribute('data-exercise','archer-pull-up');
+  await page.getByTestId('exercise-guide').screenshot({path:'test-results/guide-archer-pull-up.png'});
+});
+
+test('screen-awake preference persists and releases and reacquires when visibility changes', async ({ page }) => {
+  await page.addInitScript(() => {
+    const stats = { requested:0, released:0, visible:true };
+    (window as any).__awake = stats;
+    Object.defineProperty(document,'visibilityState',{configurable:true,get:() => stats.visible ? 'visible' : 'hidden'});
+    Object.defineProperty(navigator,'wakeLock',{ configurable:true, value:{ request:async () => {
+      stats.requested++;
+      const sentinel = new EventTarget() as EventTarget & {released:boolean;release:() => Promise<void>};
+      sentinel.released=false;
+      sentinel.release=async () => { sentinel.released=true; stats.released++; sentinel.dispatchEvent(new Event('release')); };
+      return sentinel;
+    } } });
+  });
+  await boot(page); await onboard(page); await tab(page,'Settings').click();
+  await expect(page.getByTestId('wake-status')).toHaveText('Screen stays awake');
+  await expect(page.getByRole('switch',{name:'Keep screen awake'})).toBeChecked();
+  await page.evaluate(() => { (window as any).__awake.visible=false; document.dispatchEvent(new Event('visibilitychange')); });
+  await expect.poll(() => page.evaluate(() => (window as any).__awake.released)).toBe(1);
+  await page.evaluate(() => { (window as any).__awake.visible=true; document.dispatchEvent(new Event('visibilitychange')); });
+  await expect(page.getByTestId('wake-status')).toHaveText('Screen stays awake');
+  await expect.poll(() => page.evaluate(() => (window as any).__awake.requested)).toBe(2);
+  await page.getByRole('switch',{name:'Keep screen awake'}).click();
+  await expect(page.getByTestId('wake-status')).toHaveText('Screen follows phone settings');
+  await page.reload(); await tab(page,'Settings').click();
+  await expect(page.getByRole('switch',{name:'Keep screen awake'})).not.toBeChecked();
+  await expect.poll(() => page.evaluate(() => (window as any).__awake.requested)).toBe(0);
+});

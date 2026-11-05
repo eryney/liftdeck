@@ -115,3 +115,56 @@ describe('full-body migration and optional logs', () => {
     await tick();
   });
 });
+
+
+describe('rep ceiling across repeated workouts', () => {
+  it('adds reps up to 12, advances one rung, and starts the new rung at the floor', async () => {
+    const s = new Store(); await s.init();
+    const base = s.templateById(TPL_FA)!;
+    s.saveTemplate({ ...base, exercises: [{ ...base.exercises[5], repMin: 8, repMax: 12 }] });
+    for (let target = 8; target <= 12; target++) {
+      const id = s.startWorkout(TPL_FA);
+      const ex = s.state.sessions.find((x) => x.id === id)!.exercises[0];
+      expect(ex.exerciseId).toBe('push-up'); expect(ex.targetReps).toEqual([target,target,target]);
+      for (let i = 0; i < 3; i++) s.logSet(id,ex.id,i,target);
+      s.finishWorkout(id);
+    }
+    const next = s.previewWorkout(TPL_FA)[0];
+    expect(next).toMatchObject({ exerciseId: 'diamond-push-up', variationBasis: 'advance', targetReps: [8,8,8] });
+    await tick();
+  });
+  it('keeps band and rep-only exercises capped across repeated successes at the last variation', async () => {
+    const s = new Store(); await s.init();
+    const base = s.templateById(TPL_FA)!;
+    s.saveTemplate({ ...base, exercises: [{ ...base.exercises[4], exerciseId: 'band-row-slow', repMin: 8, repMax: 12 }, base.exercises[6]] });
+    for (let n = 0; n < 12; n++) {
+      const id = s.startWorkout(TPL_FA); const exs = s.state.sessions.find((x) => x.id === id)!.exercises;
+      for (const ex of exs) {
+        expect(Math.max(...ex.targetReps!)).toBeLessThanOrEqual(12);
+        expect(ex.weight).toBe(0);
+        for (let i = 0; i < ex.targetSets; i++) s.logSet(id,ex.id,i,12);
+      }
+      s.finishWorkout(id);
+    }
+    expect(s.previewWorkout(TPL_FA)[0]).toMatchObject({ exerciseId: 'band-row-slow', variationBasis: 'top', targetReps: [12,12,12] });
+    await tick();
+  });
+  it('requires every prescribed set at the ceiling, ignores bonus sets, and resets reps when the last rung adds load', async () => {
+    const s = new Store(); await s.init(); const base = s.templateById(TPL_FA)!;
+    s.saveTemplate({ ...base, exercises: [{ ...base.exercises[5], repMin: 8, repMax: 12 }] });
+    let id = s.startWorkout(TPL_FA); let ex = s.state.sessions.find((x) => x.id === id)!.exercises[0];
+    s.logSet(id,ex.id,0,12); s.logSet(id,ex.id,1,12); s.finishWorkout(id);
+    expect(s.previewWorkout(TPL_FA)[0].exerciseId).toBe('push-up');
+    id = s.startWorkout(TPL_FA); ex = s.state.sessions.find((x) => x.id === id)!.exercises[0];
+    for (const [i,reps] of [12,12,11].entries()) s.logSet(id,ex.id,i,reps);
+    s.addSet(id,ex.id); s.logSet(id,ex.id,3,20); s.finishWorkout(id);
+    expect(s.previewWorkout(TPL_FA)[0]).toMatchObject({ exerciseId: 'push-up', targetReps: [12,12,12] });
+    s.saveTemplate({ ...base, exercises: [{ ...base.exercises[5], exerciseId: 'one-arm-push-up', repMin: 8, repMax: 12, lockVariation: true }] });
+    id = s.startWorkout(TPL_FA); ex = s.state.sessions.find((x) => x.id === id)!.exercises[0];
+    for (let i = 0; i < 3; i++) s.logSet(id,ex.id,i,12);
+    s.finishWorkout(id);
+    s.saveTemplate({ ...base, exercises: [{ ...base.exercises[5], exerciseId: 'one-arm-push-up', repMin: 8, repMax: 12 }] });
+    expect(s.previewWorkout(TPL_FA)[0]).toMatchObject({ exerciseId: 'one-arm-push-up', variationBasis: 'top', weight: 5, targetReps: [8,8,8] });
+    await tick();
+  });
+});

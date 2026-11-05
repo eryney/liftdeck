@@ -15,6 +15,7 @@ export function migrateSettings(s: Partial<AppSettings> | undefined): AppSetting
   const merged = { ...base, ...(s ?? {}), id: 'settings' } as AppSettings;
   merged.schemaVersion = SCHEMA_VERSION;
   if (!Array.isArray(merged.seedMarkers)) merged.seedMarkers = [];
+  if (typeof merged.keepAwake !== 'boolean') merged.keepAwake = base.keepAwake;
   if (merged.units !== 'kg') merged.units = 'lb';
   if (typeof merged.maWindowDays !== 'number' || merged.maWindowDays < 1) merged.maWindowDays = base.maWindowDays;
   return merged;
